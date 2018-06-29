@@ -1,5 +1,0 @@
-(executables
- ((names (gwd))
-  (libraries (geneweb))
- )
-)

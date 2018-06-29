@@ -1,0 +1,13 @@
+(executable
+  (name gwd)
+  (public_name gnt-gwd)
+  (libraries geneweb geneweb.internal uucp jingoo)
+  (modules ezgw data gwd handler interp)
+)
+
+(executable
+  (name marshaler)
+  (public_name gnt-jingoo-marshaler)
+  (libraries uucp jingoo)
+  (modules marshaler)
+)

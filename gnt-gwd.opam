@@ -1,0 +1,32 @@
+opam-version: "2.0"
+
+maintainer: [ "Julien Sagot <julien.sagot@geneanet.org>" ]
+
+authors: [ "Julien Sagot" ]
+
+dev-repo: "git://github.com/geneanet/gnt-gwd"
+
+bug-reports: "https://github.com/geneanet/gnt-gwd/issues"
+
+homepage: "https://github.com/geneanet/gnt-gwd"
+
+build: [ [ make ] ]
+
+install: [ [ make "install" ] ]
+
+remove: [ [ make "uninstall" ] ]
+
+pin-depends: [
+  # geneweb need piqi and piqilib dev versions
+  [ "piqilib.dev" "git://github.com/alavrik/piqi" ]
+  [ "piqi.dev" "git://github.com/alavrik/piqi-ocaml" ]
+  [ "geneweb.dev" "git://github.com/geneanet/geneweb" ]
+  [ "jingoo.dev" "git://github.com/geneanet/jingoo" ]
+]
+
+depends: [
+  "dune" { build>= "1.1.1" }
+  "geneweb" { = "dev" }
+  "jingoo" { = "dev" }
+  "ocaml" { >= "4.05" }
+]
