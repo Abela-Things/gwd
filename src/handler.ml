@@ -330,6 +330,7 @@ let print_mrg_ind conf base ip1 ip2 =
     Interp.render ~file:"mrg_ind" ~models
 
 let _no_mode self conf base =
+  print_endline __LOC__ ;
   match find_person_in_env conf base "" with
   | Some p ->
     let models =
@@ -337,58 +338,85 @@ let _no_mode self conf base =
       :: Data.default_env conf base
     in
     let file =
-      let etatcivil = ref "1" in
-      let parent = ref "1" in
-      let union = ref "1" in
-      let freresoeur = ref "1" in
-      let relations = ref "1" in
-      let famille = ref "0" in
-      let notes = ref "1" in
-      let sources = ref "1" in
-      let arbre = ref "2" in
-      let n =
-        try int_of_string @@ List.assoc "module_perso_tplnb" conf.base_env
-        with _ -> 0
-      in
+      let etatcivil = ref 1 in
+      let parent = ref 1 in
+      let union = ref 1 in
+      let freresoeur = ref 1 in
+      let relations = ref 1 in
+      let famille = ref 0 in
+      let notes = ref 1 in
+      let sources = ref 1 in
+      let arbre = ref 2 in
       (* let timeline = ref "0" in *)
       let () =
-        for i = 0 to n - 1 do
-          try match List.assoc ("module_perso_" ^ string_of_int i) conf.base_env with
-            | "arbre_1" -> arbre := "1"
-            | "arbre_2" -> arbre := "2"
-            | "arbre_3" -> arbre := "3"
-            | "arbre_4" -> arbre := "4"
-            | "etatcivil_1" -> etatcivil := "1"
-            | "famille_1" -> famille := "1"
-            | "freresoeur_1" -> freresoeur := "1"
-            | "freresoeur_3" -> freresoeur := "3"
-            | "notes_1" -> notes := "1"
-            | "parent_1" -> parent := "1"
-            | "parent_2" -> parent := "2"
-            | "parent_3" -> parent := "3"
-            | "parent_4" -> parent := "4"
-            | "relations_1" -> relations := "1"
-            | "sources_1" -> sources := "1"
-            (* | "timeline_1" -> timeline := "1" *)
-            | "union_1" -> union := "1"
-            | "union_2" -> union := "2"
-            | "union_3" -> union := "3"
-            | "union_4" -> union := "4"
-            | s -> failwith s
-          with _ ->
-            List.iter print_endline @@ List.map fst conf.base_env ; assert false
-        done
+        print_endline __LOC__ ;
+        match List.assoc_opt "p_mod" conf.env with
+        | Some s when String.length s = 18 ->
+          print_endline __LOC__ ;
+          let read i = (Char.code @@ String.unsafe_get s i) - 48 in
+          assert (String.unsafe_get s 0 = 'i') ;
+          etatcivil := read 1 ;
+          assert (String.unsafe_get s 2 = 'p') ;
+          parent := read 3 ;
+          assert (String.unsafe_get s 4 = 'u') ;
+          union := read 5 ;
+          assert (String.unsafe_get s 6 = 'f') ;
+          freresoeur := read 7 ;
+          assert (String.unsafe_get s 8 = 'r') ;
+          relations := read 9 ;
+          assert (String.unsafe_get s 10 = 'g') ;
+          famille := read 11 ;
+          assert (String.unsafe_get s 12 = 'n') ;
+          notes := read 13 ;
+          assert (String.unsafe_get s 14 = 's') ;
+          sources := read 15 ;
+          assert (String.unsafe_get s 16 = 'a') ;
+          arbre := read 17 ;
+        | Some _ -> print_endline __LOC__ ; assert false
+        | None ->
+          let n =
+            try int_of_string @@ List.assoc "module_perso_tplnb" conf.base_env
+            with _ -> 0
+          in
+          print_endline __LOC__ ;
+          for i = 0 to n - 1 do
+            try match List.assoc ("module_perso_" ^ string_of_int i) conf.base_env with
+              | "arbre_1" -> arbre := 1
+              | "arbre_2" -> arbre := 2
+              | "arbre_3" -> arbre := 3
+              | "arbre_4" -> arbre := 4
+              | "etatcivil_1" -> etatcivil := 1
+              | "famille_1" -> famille := 1
+              | "freresoeur_1" -> freresoeur := 1
+              | "freresoeur_3" -> freresoeur := 3
+              | "notes_1" -> notes := 1
+              | "parent_1" -> parent := 1
+              | "parent_2" -> parent := 2
+              | "parent_3" -> parent := 3
+              | "parent_4" -> parent := 4
+              | "relations_1" -> relations := 1
+              | "sources_1" -> sources := 1
+              (* | "timeline_1" -> timeline := 1 *)
+              | "union_1" -> union := 1
+              | "union_2" -> union := 2
+              | "union_3" -> union := 3
+              | "union_4" -> union := 4
+              | s -> failwith s
+            with _ ->
+              List.iter print_endline @@ List.map fst conf.base_env ; assert false
+          done
       in
-      "perso_templates/perso_"
-      ^ !etatcivil
-      ^ !parent
-      ^ !union
-      ^ !freresoeur
-      ^ !relations
-      ^ !famille
-      ^ !notes
-      ^ !sources
-      ^ !arbre
+      Printf.sprintf
+        "perso_templates/perso_%d%d%d%d%d%d%d%d%d"
+        !etatcivil
+        !parent
+        !union
+        !freresoeur
+        !relations
+        !famille
+        !notes
+        !sources
+        !arbre
     in
     Interp.render ~file ~models
   | _ -> self.RequestHandler.very_unknown self conf base
@@ -488,19 +516,12 @@ let handler =
           Interp.render ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
       end
 
-
-    (* ; n = begin fun _self conf base ->
-     *     match p_getenv conf.env "v" with
-     *     | Some v -> Some.surname_print conf base Some.surname_not_found v
-     *     | _ ->
-     *       let () = load_persons_array base in
-     *       print_alln conf base true
-     *   end *)
-
-
-    ; n = begin fun _self _conf _base ->
-        if !Mutil.utf_8_db then failwith __LOC__
-        else failwith __LOC__
+    ; n = begin fun _self conf base ->
+        match p_getenv conf.env "v" with
+        | Some v -> Some.surname_print conf base Some.surname_not_found v
+        | _ ->
+          let () = load_persons_array base in
+          print_alln conf base true
       end
 
     ; oa = begin fun self conf base ->

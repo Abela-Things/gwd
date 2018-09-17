@@ -6,7 +6,7 @@ let tfun1 name fn =
   Tfun (fun args _ -> match args with [ Tstr a ]-> fn a | _ -> failwith name)
 
 let rec mk_family (conf : Config.config) base fcd =
-  let module E = Geneweb.Env.Family in
+  let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
   let get_str = get Jg_runtime.box_string in
   let get_bool = get Jg_runtime.box_bool in
@@ -188,7 +188,7 @@ and get_n_mk_person conf base (i : Adef.iper) =
   unsafe_mk_person conf base (Util.pget conf base i)
 
 and mk_relation conf base r =
-  let module E = Geneweb.Env.Relation in
+  let module E = Ezgw.Relation in
   let has_relation_her = Tbool (E.has_relation_her r) in
   let has_relation_him = Tbool (E.has_relation_her r) in
   let related = mk_related conf base @@ E.related r in
@@ -208,7 +208,7 @@ and mk_relation conf base r =
     )
 
 and mk_related conf base r =
-  let module E = Geneweb.Env.Related in
+  let module E = Ezgw.Related in
   let iper_ = E.iper r in
   let iper = Tint (Adef.int_of_iper iper_) in
   let person = Tlazy (lazy (get_n_mk_person conf base iper_)) in
@@ -221,7 +221,7 @@ and mk_related conf base r =
     )
 
 and mk_event conf base ((name, _date, _place, _note, _src, _w, _isp) as d) =
-  let module E = Geneweb.Env.Event in
+  let module E = Ezgw.Event in
   let date =
     match E.date d with
     | Some d -> mk_date conf d
@@ -257,7 +257,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let get_bool = get Jg_runtime.box_bool in
   let get_int = get Jg_runtime.box_int in
   let get_float = get Jg_runtime.box_float in
-  let module E = Geneweb.Env.Person in
+  let module E = Ezgw.Person in
   let parents =
     lazy (match E.parents p with
         | Some ifam -> Some (Gwdb.foi base ifam)

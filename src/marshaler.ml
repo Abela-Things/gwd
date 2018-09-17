@@ -54,4 +54,5 @@ let () =
   in
   let anonfun s = raise (Arg.Bad s) in
   Arg.parse speclist anonfun usage ;
+  print_endline @@ !dir ;
   compile_dir !dir

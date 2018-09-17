@@ -1,7 +1,7 @@
 (* /!\ This is mostly copy/paste of the Perso module /!\ *)
 (* Sync with perso from ed7525bac *)
 
-#ifdef API
+open Geneweb
 
 module MLink = Api_link_tree_piqi
 open Config
@@ -169,8 +169,8 @@ module Person = struct
   (* FIXME *)
   let death_age conf p =
     match Date.get_birth_death_date p with
-    | Some (Dgreg (({prec = Sure | About | Maybe} as d1), _)),
-      Some (Dgreg (({prec = Sure | About | Maybe} as d2), _)), approx
+    | Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _)),
+      Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)), approx
       when d1 <> d2 ->
       let a = CheckItem.time_elapsed d1 d2 in
       let s =
@@ -635,8 +635,8 @@ module Person = struct
 
   let is_computable_death_age p =
     match Date.get_birth_death_date p with
-    | ( Some (Dgreg (({prec = Sure | About | Maybe} as d1), _))
-      , Some (Dgreg (({prec = Sure | About | Maybe} as d2), _))
+    | ( Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _))
+      , Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _))
       , _ )
       when d1 <> d2 ->
       let a = CheckItem.time_elapsed d1 d2 in
@@ -651,8 +651,8 @@ module Person = struct
         Adef.od_of_codate (get_birth p),
         Adef.od_of_codate (get_marriage fam)
       with
-      | ( Some (Dgreg (({prec = Sure | About | Maybe} as d1), _))
-        , Some (Dgreg (({prec = Sure | About | Maybe} as d2), _)) ) ->
+      | ( Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _))
+        , Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)) ) ->
         let a = CheckItem.time_elapsed d1 d2 in
         a.year > 0 ||
         a.year = 0 && (a.month > 0 || a.month = 0 && a.day > 0)
@@ -747,8 +747,8 @@ module Person = struct
         Adef.od_of_codate (get_birth p),
         Adef.od_of_codate (get_marriage fam)
       with
-        Some (Dgreg (({prec = Sure | About | Maybe} as d1), _)),
-        Some (Dgreg (({prec = Sure | About | Maybe} as d2), _)) ->
+        Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _)),
+        Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)) ->
         let a = CheckItem.time_elapsed d1 d2 in
         Date.string_of_age conf a
       | _ -> ""
@@ -1177,15 +1177,15 @@ end
 module Relation = struct
 
   let has_relation_her = function
-    | ({ r_moth = Some _}, None) -> true
+    | ({ r_moth = Some _ ; _}, None) -> true
     | _ -> false
 
   let has_relation_him = function
-    | ({ r_fath = Some _}, None) -> true
+    | ({ r_fath = Some _ ; _}, None) -> true
     | _ -> false
 
   let related : _ -> rel_ = function
-    | ({ r_type = rt }, Some p) ->
+    | ({ r_type = rt ; _ }, Some p) ->
       (index_of_sex (get_sex p), rt, get_key_index p, false)
     | _ -> raise Not_found
 
@@ -1205,11 +1205,11 @@ module Relation = struct
     | _ -> raise Not_found
 
   let relation_her = function
-    |  ({r_moth = Some ip; r_type = rt}, None) ->  (1, rt, ip, true)
+    |  ({r_moth = Some ip; r_type = rt ; _}, None) ->  (1, rt, ip, true)
     | _ -> raise Not_found
 
   let relation_him = function
-    | ({r_fath = Some ip; r_type = rt}, None) -> (0, rt, ip, true)
+    | ({r_fath = Some ip; r_type = rt ; _}, None) -> (0, rt, ip, true)
     | _ -> raise Not_found
 
 end
@@ -1367,5 +1367,3 @@ module Event = struct
     | None -> raise Not_found
 
 end
-
-#endif
