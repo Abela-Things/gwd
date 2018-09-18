@@ -941,6 +941,7 @@ let translate conf (* base *) =
   let nth =
     Tfun (fun arg _ -> match arg with
         | [ Tstr s ; Tint i ] -> Tstr (Util.transl_nth conf s i)
+        | [ Tstr s ; Tstr i ] -> Tstr (Util.transl_nth conf s @@ int_of_string i)
         | _ -> assert false)
   in
   let transl_a_of_b =
