@@ -957,6 +957,7 @@ let translate conf (* base *) =
   let ftransl =
     Tfun (fun arg _ -> match arg with
         | [ Tstr s ; Tint i ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
+        | [ Tstr s ; Tstr s' ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
         | Tstr s :: _ -> failwith s
         | _ -> assert false)
   in
