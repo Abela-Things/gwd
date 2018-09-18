@@ -117,9 +117,18 @@ and mk_date conf d =
       | Maybe -> "maybe"
       | Before -> "before"
       | After -> "after"
-      | OrYear _ -> assert false
-      | YearInt _ -> assert false)
+      | OrYear _ -> "oryear"
+      | YearInt _ -> "yearint")
     )
+  in
+  let d2 = lazy_field (fun d c -> match d.Def.prec with
+      | OrYear d2 | YearInt d2 ->
+        mk_date conf (Def.Dgreg ( { Def.day = d2.Def.day2
+                                  ; month = d2.Def.month2
+                                  ; year = d2.Def.year2
+                                  ; prec = Def.Sure ; delta = 0 }
+                                , c) )
+      | _ -> Tnull )
   in
   let calendar =
     lazy_field (fun _ -> function
@@ -130,6 +139,7 @@ and mk_date conf d =
   in
   Tpat (function
       | "calendar" -> calendar
+      | "d2" -> d2
       | "day" -> day
       | "month" -> month
       | "prec" -> prec
