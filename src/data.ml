@@ -5,6 +5,8 @@ open Jg_types
 let tfun1 name fn =
   Tfun (fun args _ -> match args with [ Tstr a ]-> fn a | _ -> failwith name)
 
+let mk_opt fn = function None -> Tnull | Some x -> fn x
+
 let rec mk_family (conf : Config.config) base fcd =
   let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
@@ -24,6 +26,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let children =
     Tlazy (lazy (Tarray (Array.map (get_n_mk_person conf base) (E.children fcd)) ) )
   in
+  let marriage_date = mk_opt (mk_date conf) (E.marriage_date fcd) in
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
   let marriage_source = get_str (E.marriage_source conf base) in
@@ -54,6 +57,7 @@ let rec mk_family (conf : Config.config) base fcd =
       | "has_witnesses" -> has_witnesses
       | "is_no_mention" -> is_no_mention
       | "is_no_sexes_check" -> is_no_sexes_check
+      | "marriage_date" -> marriage_date
       | "marriage_place" -> marriage_place
       | "marriage_note" -> marriage_note
       | "marriage_source" -> marriage_source
