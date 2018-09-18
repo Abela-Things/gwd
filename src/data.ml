@@ -766,26 +766,10 @@ let mk_conf conf base =
   let no_note = Tbool conf.no_note in
   let bname = Tstr conf.bname in
   let cgi_passwd = Tstr conf.cgi_passwd in
-  let env =
-    Tlazy (lazy (let h = Hashtbl.create (List.length conf.env) in
-                 List.iter (fun (k, v) -> Hashtbl.add h k (Tstr v)) conf.env ;
-                 Thash h) )
-  in
-  let senv =
-    let h = Hashtbl.create (List.length conf.senv) in
-    List.iter (fun (k, v) -> Hashtbl.add h k (Tstr v)) conf.senv ;
-    Thash (h)
-  in
-  let henv =
-    let h = Hashtbl.create (List.length conf.henv) in
-    List.iter (fun (k, v) -> Hashtbl.add h k (Tstr v)) conf.henv ;
-    Thash (h)
-  in
-  let base_env =
-    Tlazy (lazy (let h = Hashtbl.create (List.length conf.env) in
-                 List.iter (fun (k, v) -> Hashtbl.add h k (Tstr v)) conf.base_env ;
-                 Thash h) )
-  in
+  let env = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.env) in
+  let senv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.senv) in
+  let henv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.henv) in
+  let benv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env) in
   let allowed_titles =
     Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.allowed_titles) ) ) )
   in
@@ -817,7 +801,7 @@ let mk_conf conf base =
       | "auth_scheme" -> auth_scheme
       | "authorized_wizards_notes" -> authorized_wizards_notes
       | "b_arg_for_basename" -> bArgForBasename
-      | "base_env" -> base_env
+      | "benv" -> benv
       | "bname" -> bname
       | "border" -> border
       | "can_send_image" -> can_send_image
