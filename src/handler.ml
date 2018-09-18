@@ -164,16 +164,8 @@ let print_chg_chn conf base ip =
   in
   Interp.render ~file:"chg_chn" ~models
 
-let print_d conf base ip =
+let print_d self conf base ip =
   match p_getenv conf.env "t", p_getint conf.env "v" with
-  | Some ("F" | "L" | "M"), _ ->
-    Interp.render ~file:"deslist" ~models:(Data.default_env conf base)
-  | Some "D", _ ->
-    Interp.render ~file:"deslist_hr" ~models:(Data.default_env conf base)
-  | Some "I", _ ->
-    Interp.render ~file:"destable" ~models:(Data.default_env conf base)
-  | Some "V", _ ->
-    Interp.render ~file:"destree" ~models:(Data.default_env conf base)
   | Some "A", Some v ->
     let models =
       ("ind", Data.get_n_mk_person conf base ip)
@@ -182,14 +174,7 @@ let print_d conf base ip =
       :: Data.default_env conf base
     in
     Interp.render ~file:"descend.print_aboville" ~models
-  | Some "S", Some _ (* -> display_descendants_level conf base v p *)
-  | Some "K", Some _ (* -> display_descendant_with_table conf base v p *)
-  | Some "N", Some _ (* -> display_descendants_with_numbers conf base v p *)
-  | Some "G", Some _ (* -> display_descendant_index conf base v p *)
-  | Some "C", Some _ (* -> display_spouse_index conf base v p *)
-  | Some "T", Some _ (* -> print_tree conf base v p *)
-  | _ ->
-    Interp.render ~file:"desmenu" ~models:(Data.default_env conf base)
+  | _ -> RequestHandler.defaultHandler.d self conf base
 
 let print_del_ind conf base i =
   let models =
@@ -450,7 +435,7 @@ let handler =
 
     ; d = begin fun self conf base ->
         match find_person_in_env conf base "" with
-        | Some p -> print_d conf base (Gwdb.get_key_index p)
+        | Some p -> print_d self conf base (Gwdb.get_key_index p)
         | _ -> self.very_unknown self conf base
       end
 
