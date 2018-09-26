@@ -431,6 +431,14 @@ let _no_mode self conf base =
     Interp.render ~file ~models
   | _ -> self.RequestHandler.very_unknown self conf base
 
+let restricted_wizard fn self conf base =
+  if conf.wizard then fn self conf base
+  else self.RequestHandler.incorrect_request self conf base
+
+let restricted_friend fn self conf base =
+  if conf.wizard || conf.friend then fn self conf base
+  else self.RequestHandler.incorrect_request self conf base
+
 let handler =
   let open RequestHandler in
   { defaultHandler
@@ -438,18 +446,17 @@ let handler =
 
       _no_mode
 
-    ; b = begin fun self conf base ->
-        if conf.wizard || conf.friend then print_birth conf base
-        else self.incorrect_request self conf base
+    ; b = begin restricted_friend @@ fun _self conf base ->
+        print_birth conf base
       end
 
-    ; chg_chn = begin fun self conf base ->
+    ; chg_chn = begin restricted_wizard @@ fun self conf base ->
         match p_getint conf.env "ip" with
         | Some i -> print_chg_chn conf base (Adef.iper_of_int i)
         | _ -> self.incorrect_request self conf base
       end
 
-    ; chg_chn_ok = begin fun self conf base ->
+    ; chg_chn_ok = begin restricted_wizard @@ fun self conf base ->
         match p_getint conf.env "ip" with
         | Some i -> print_chg_chn_ok conf base (Adef.iper_of_int i)
         | _ -> self.incorrect_request self conf base
@@ -461,17 +468,15 @@ let handler =
         | _ -> self.very_unknown self conf base
       end
 
-    ; del_ind = begin fun self conf base ->
-        if conf.wizard then
-          match p_getint conf.env "i" with
-          | Some i -> print_del_ind conf base (Adef.iper_of_int i)
-          | _ -> self.incorrect_request self conf base
-        else self.incorrect_request self conf base
+    ; del_ind = begin restricted_wizard @@ fun self conf base ->
+        match p_getint conf.env "i" with
+        | Some i -> print_del_ind conf base (Adef.iper_of_int i)
+        | _ -> self.incorrect_request self conf base
       end
 
-    ; del_ind_ok = begin fun self conf base ->
-        match conf.wizard, p_getint conf.env "i" with
-        | true, Some i ->
+    ; del_ind_ok = begin restricted_wizard @@ fun self conf base ->
+        match p_getint conf.env "i" with
+        | Some i ->
           let ip = Adef.iper_of_int i in
           let p = poi base ip in
           let fn = sou base (get_first_name p) in
@@ -501,35 +506,32 @@ let handler =
         print_ll conf base
       end
 
-    ; mrg = begin fun self conf base ->
-        if conf.wizard then match find_person_in_env conf base "" with
-          | Some p -> print_mrg conf base p
-          | _ -> self.very_unknown self conf base
-        else self.incorrect_request self conf base
+    ; mrg = begin restricted_wizard @@ fun self conf base ->
+        match find_person_in_env conf base "" with
+        | Some p -> print_mrg conf base p
+        | _ -> self.very_unknown self conf base
       end
 
-    ; mrg_ind = begin fun self conf base ->
-        if conf.wizard then
-          try match p_getint conf.env "i" with
-            | None -> raise Not_found
-            | Some i ->
-              let ip1 = Adef.iper_of_int i in
-              let ip2 =
-                match p_getint conf.env "i2" with
-                | Some i2 -> Adef.iper_of_int i2
-                | None -> match p_getenv conf.env "select", p_getenv conf.env "n" with
-                  | (Some "input" | None), Some n ->
-                    begin match Gutil.person_ht_find_all base n with
-                      | [ip2] -> ip2
-                      | _ -> raise Not_found
-                    end
-                  | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
-                  | _ -> raise Not_found
-              in
-              print_mrg_ind conf base ip1 ip2
-          with Not_found ->
-            Interp.render ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
-        else self.incorrect_request self conf base
+    ; mrg_ind = begin restricted_wizard @@ fun _self conf base ->
+        try match p_getint conf.env "i" with
+          | None -> raise Not_found
+          | Some i ->
+            let ip1 = Adef.iper_of_int i in
+            let ip2 =
+              match p_getint conf.env "i2" with
+              | Some i2 -> Adef.iper_of_int i2
+              | None -> match p_getenv conf.env "select", p_getenv conf.env "n" with
+                | (Some "input" | None), Some n ->
+                  begin match Gutil.person_ht_find_all base n with
+                    | [ip2] -> ip2
+                    | _ -> raise Not_found
+                  end
+                | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
+                | _ -> raise Not_found
+            in
+            print_mrg_ind conf base ip1 ip2
+        with Not_found ->
+          Interp.render ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
       end
 
     ; n = begin fun _self conf base ->
@@ -540,14 +542,12 @@ let handler =
           print_alln conf base true
       end
 
-    ; oa = begin fun self conf base ->
-        if conf.wizard || conf.friend then print_oa conf base
-        else self.incorrect_request self conf base
+    ; oa = begin restricted_friend @@ fun _self conf base ->
+        print_oa conf base
       end
 
-    ; oe = begin fun self conf base ->
-        if conf.wizard || conf.friend then print_oe conf base
-        else self.incorrect_request self conf base
+    ; oe = begin restricted_friend @@ fun _self conf base ->
+        print_oe conf base
       end
 
     (* ; p = begin fun _self conf base ->
@@ -556,9 +556,8 @@ let handler =
      *     | None -> print_alln conf base false
      *   end *)
 
-    ; pop_pyr = begin fun self conf base ->
-        if conf.wizard || conf.friend then print_pop_pyr conf base
-        else self.incorrect_request self conf base
+    ; pop_pyr = begin restricted_friend @@ fun _self conf base ->
+        print_pop_pyr conf base
       end
 
   }
