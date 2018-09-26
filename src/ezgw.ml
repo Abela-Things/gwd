@@ -87,7 +87,7 @@ module Person = struct
     Util.acces conf base p
 
   let age conf p =
-    match Adef.od_of_codate (get_birth p), get_death p with
+    match Adef.od_of_cdate (get_birth p), get_death p with
     | Some (Dgreg (d, _)), NotDead ->
       CheckItem.time_elapsed d conf.today
     | _ -> raise Not_found
@@ -133,6 +133,11 @@ module Person = struct
 
   let burial_note conf base p =
     mk_note conf base p (get_burial_note p)
+
+  let children base p =
+    Array.fold_right
+      (fun ifam -> Array.fold_right List.cons (get_children @@ foi base ifam) )
+      (get_family p) []
 
   (* let child conf base p =
    *   match get_env "child" env with
@@ -234,7 +239,7 @@ module Person = struct
      get_aliases p <> []
 
   let has_baptism_date p =
-    get_baptism p <> Adef.codate_None
+    get_baptism p <> Adef.cdate_None
 
   let has_baptism_place base p =
     sou base (get_baptism_place p) <> ""
@@ -256,7 +261,7 @@ module Person = struct
     loop (Perso.events_list conf base p)
 
   let has_birth_date p =
-    get_birth p <> Adef.codate_None
+    get_birth p <> Adef.cdate_None
 
   let has_birth_place base p =
     sou base (get_birth_place p) <> ""
@@ -279,7 +284,7 @@ module Person = struct
 
   let has_burial_date p =
     match get_burial p with
-    | Buried cod -> Adef.od_of_codate cod <> None
+    | Buried cod -> Adef.od_of_cdate cod <> None
     | _ -> false
 
   let has_burial_place base p =
@@ -375,7 +380,7 @@ module Person = struct
 
   let has_cremation_date p =
     match get_burial p with
-    | Cremated cod -> Adef.od_of_codate cod <> None
+    | Cremated cod -> Adef.od_of_cdate cod <> None
     | _ -> false
 
   let has_cremation_place base p =
@@ -597,7 +602,7 @@ module Person = struct
       conf base p (p_first_name base p) (p_surname base p)
 
   let is_birthday conf p =
-    match Adef.od_of_codate (get_birth p) with
+    match Adef.od_of_cdate (get_birth p) with
     | Some (Dgreg (d, _)) ->
       if d.prec = Sure && get_death p = NotDead then
         d.day = conf.today.day && d.month = conf.today.month &&
@@ -628,7 +633,7 @@ module Person = struct
     | _ -> false
 
   let is_computable_age p =
-    match Adef.od_of_codate (get_birth p), get_death p with
+    match Adef.od_of_cdate (get_birth p), get_death p with
     | Some (Dgreg (d, _)), NotDead ->
       not (d.day = 0 && d.month = 0 && d.prec <> Sure)
     | _ -> false
@@ -648,8 +653,8 @@ module Person = struct
     let (_, fam, _, m_auth) = get_env env.fam in
     if m_auth then
       match
-        Adef.od_of_codate (get_birth p),
-        Adef.od_of_codate (get_marriage fam)
+        Adef.od_of_cdate (get_birth p),
+        Adef.od_of_cdate (get_marriage fam)
       with
       | ( Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _))
         , Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)) ) ->
@@ -687,7 +692,7 @@ module Person = struct
     | Some (_, fam, _, m_auth) ->
       begin match get_relation fam, get_divorce fam with
           (Married | NoSexesCheckMarried), NotDivorced ->
-          begin match m_auth, Adef.od_of_codate (get_marriage fam) with
+          begin match m_auth, Adef.od_of_cdate (get_marriage fam) with
               true, Some (Dgreg (d, _)) ->
               let father = pget conf base (get_father fam) in
               let mother = pget conf base (get_mother fam) in
@@ -744,8 +749,8 @@ module Person = struct
     let (_, fam, _, m_auth) = get_env env.fam in
     if m_auth then
       match
-        Adef.od_of_codate (get_birth p),
-        Adef.od_of_codate (get_marriage fam)
+        Adef.od_of_cdate (get_birth p),
+        Adef.od_of_cdate (get_marriage fam)
       with
         Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _)),
         Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)) ->
@@ -851,14 +856,14 @@ module Person = struct
     string_with_macros conf [] s
 
   let on_baptism_date conf ?(long_date = false) p =
-    match Adef.od_of_codate (get_baptism p) with
+    match Adef.od_of_cdate (get_baptism p) with
     | Some d ->
       if long_date then Date.string_of_ondate conf d ^ Date.get_wday conf d
       else Date.string_of_ondate conf d
     | _ -> raise Not_found
 
   let on_birth_date conf ?(long_date = false) p =
-    match Adef.od_of_codate (get_birth p) with
+    match Adef.od_of_cdate (get_birth p) with
     | Some d ->
       if long_date then Date.string_of_ondate conf d ^ Date.get_wday conf d
       else Date.string_of_ondate conf d
@@ -875,8 +880,8 @@ module Person = struct
     List.sort
       (fun (c1, _) (c2, _) ->
          let mk_date c =
-           match Adef.od_of_codate (get_baptism c) with
-           | None -> Adef.od_of_codate (get_birth c)
+           match Adef.od_of_cdate (get_baptism c) with
+           | None -> Adef.od_of_cdate (get_birth c)
            | x -> x
          in
          match mk_date c1, mk_date c2 with
@@ -893,12 +898,12 @@ module Person = struct
       [] (List.sort_uniq compare (get_related p))
 
   let slash_baptism_date conf p =
-    match Adef.od_of_codate (get_baptism p) with
+    match Adef.od_of_cdate (get_baptism p) with
     | Some d -> Date.string_slash_of_date conf d
     | _ -> ""
 
   let slash_birth_date conf p =
-    match Adef.od_of_codate (get_birth p) with
+    match Adef.od_of_cdate (get_birth p) with
     | Some d -> Date.string_slash_of_date conf d
     | _ -> ""
 
@@ -914,7 +919,7 @@ module Person = struct
   let on_burial_date conf p =
     match get_burial p with
     | Buried cod ->
-      begin match Adef.od_of_codate cod with
+      begin match Adef.od_of_cdate cod with
         | Some d ->
           begin match p_getenv conf.base_env "long_date" with
               Some "yes" ->
@@ -944,7 +949,7 @@ module Person = struct
   let slash_burial_date conf p =
     match get_burial p with
     | Buried cod ->
-      begin match Adef.od_of_codate cod with
+      begin match Adef.od_of_cdate cod with
         | Some d -> Date.string_slash_of_date conf d
         | _ -> ""
       end
@@ -953,7 +958,7 @@ module Person = struct
   let on_cremation_date conf p =
     match get_burial p with
       Cremated cod ->
-      begin match Adef.od_of_codate cod with
+      begin match Adef.od_of_cdate cod with
         | Some d ->
           begin match p_getenv conf.base_env "long_date" with
               Some "yes" ->
@@ -967,7 +972,7 @@ module Person = struct
   let slash_cremation_date conf p =
     match get_burial p with
     | Cremated cod ->
-      begin match Adef.od_of_codate cod with
+      begin match Adef.od_of_cdate cod with
         | Some d -> Date.string_slash_of_date conf d
         | _ -> ""
       end
@@ -1242,7 +1247,7 @@ module Family = struct
   let divorce_date conf (_, fam, _, m_auth) =
     match get_divorce fam with
     | Divorced d ->
-      begin match Adef.od_of_codate d with
+      begin match Adef.od_of_cdate d with
         | Some d when m_auth && p_getenv conf.base_env "long_date" = Some "yes" ->
           Date2.string_of_ondate conf d ^ Date2.get_wday conf d
         | Some d when m_auth -> Date2.string_of_ondate conf d
@@ -1281,7 +1286,7 @@ module Family = struct
     get_relation fam = NoSexesCheckMarried
 
   let marriage_date (_, fam, (_, _, _), m_auth) =
-    if m_auth then Adef.od_of_codate (get_marriage fam) else None
+    if m_auth then Adef.od_of_cdate (get_marriage fam) else None
 
   (* FIXME: string_of_place was called but might not be useful here *)
   let marriage_place base (_, fam, _, m_auth) =
@@ -1330,7 +1335,7 @@ module Family = struct
 
   let on_marriage_date conf (_, fam, _, m_auth) =
     if m_auth then
-      match Adef.od_of_codate (get_marriage fam) with
+      match Adef.od_of_cdate (get_marriage fam) with
       | Some s ->
         begin match p_getenv conf.base_env "long_date" with
           | Some "yes" ->
@@ -1359,7 +1364,7 @@ end
 module Event = struct
 
   let date (_, d, _, _, _, _, _) =
-    Adef.od_of_codate d
+    Adef.od_of_cdate d
 
   let spouse base (_, _, _, _, _, _, isp) =
     match isp with

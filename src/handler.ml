@@ -26,7 +26,7 @@ let print_oe conf base =
       let wife = Util.pget conf base (get_mother fam) in
       match get_death husb, get_death wife with
       | (NotDead | DontKnowIfDead), (NotDead | DontKnowIfDead) ->
-        Adef.od_of_codate (get_marriage fam)
+        Adef.od_of_cdate (get_marriage fam)
       | _ -> None
     else None
   in
@@ -38,7 +38,7 @@ let print_lm conf base =
   let get_date _ fam =
     let rel = get_relation fam in
     if rel = Married || rel = NoSexesCheckMarried then
-      Adef.od_of_codate (get_marriage fam)
+      Adef.od_of_cdate (get_marriage fam)
     else None
   in
   let data = birth_death_aux_fam conf base get_date false in
@@ -64,7 +64,7 @@ let birth_death_aux conf base fn bool =
   list
 
 let print_birth conf base =
-  let data = birth_death_aux conf base (fun p -> Adef.od_of_codate (get_birth p)) false in
+  let data = birth_death_aux conf base (fun p -> Adef.od_of_cdate (get_birth p)) false in
   let models = ("data", Tlist data) :: Data.default_env conf base in
   Interp.render ~file:"latest_birth" ~models
 
@@ -86,9 +86,9 @@ let print_oa conf base =
   in
   let get_oldest_alive p =
     match get_death p with
-    | NotDead -> Adef.od_of_codate (get_birth p)
+    | NotDead -> Adef.od_of_cdate (get_birth p)
     | DontKnowIfDead when limit > 0 ->
-        begin match Adef.od_of_codate (get_birth p) with
+        begin match Adef.od_of_cdate (get_birth p) with
           Some (Dgreg (d, _)) as x when conf.today.year - d.year <= limit -> x
         | _ -> None
         end
@@ -104,7 +104,7 @@ let print_oa conf base =
 let print_ll conf base =
   let get_longest p =
     if Util.authorized_age conf base p then
-      match Adef.od_of_codate (get_birth p), get_death p with
+      match Adef.od_of_cdate (get_birth p), get_death p with
         Some (Dgreg (bd, _)), Death (_, cd) ->
           begin match Adef.date_of_cdate cd with
             Dgreg (dd, _) ->
@@ -164,6 +164,33 @@ let print_chg_chn conf base ip =
   in
   Interp.render ~file:"chg_chn" ~models
 
+let print_chg_chn_ok conf base ip =
+  try
+    if p_getenv conf.env "return" <> None then print_chg_chn conf base ip
+    else
+      begin
+        let p = Gwdb.poi base ip in
+        let ipl = Ezgw.Person.children base p in
+        let parent_surname = p_surname base p in
+        ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
+        let changed =
+          try ChangeChildren.change_children conf base parent_surname ipl
+          with ChangeChildren.FirstNameMissing _ip -> failwith "TODO"
+        in
+        Util.commit_patches conf base;
+        let changed =
+          U_Change_children_name
+            (Util.string_gen_person base (gen_person_of_person p), changed)
+        in
+        History.record conf base changed "cn";
+        let models =
+          ("ind", Data.get_n_mk_person conf base ip)
+          :: Data.default_env conf base
+        in
+        Interp.render ~file:"chg_chn_ok" ~models
+      end
+  with Update.ModErr -> ()      (* FIXME? *)
+
 let print_d self conf base ip =
   match p_getenv conf.env "t", p_getint conf.env "v" with
   | Some "A", Some v ->
@@ -187,8 +214,7 @@ let print_del_ind_ok conf base =
   let models = Data.default_env conf base in
   Interp.render ~file:"del_ind" ~models
 
-let print_mrg conf base _p_auth p =
-  (* FIXME: p_auth *)
+let print_mrg conf base p =
   let this_key_index = get_key_index p in
   let list =
     Gutil.find_same_name base p
@@ -263,7 +289,6 @@ let print_alln conf base surname =
   | _ -> failwith __LOC__
   (* | _ -> print_alphabetic conf base surname *)
 
-(* FIXME: security *)
 let print_mrg_ind conf base ip1 ip2 =
   let p1 = Gwdb.poi base ip1 in
   let p2 = Gwdb.poi base ip2 in
@@ -305,10 +330,10 @@ let print_mrg_ind conf base ip1 ip2 =
       Interp.render ~file:"mrg_ind" ~models
   with
   | Geneweb.MergeInd.Same_person ->
-    let models = ("error", Tpat (function "same_person" -> Tbool true | _ -> assert false) ) :: env in
+    let models = ("error", Tpat (function "same_person" -> Tbool true | _ -> raise Not_found) ) :: env in
     Interp.render ~file:"mrg_ind" ~models
   | Geneweb.MergeInd.Different_sexes ->
-    let models = ( "error", Tpat (function "different_sexes" -> Tbool true | _ -> assert false) ) :: env  in
+    let models = ( "error", Tpat (function "different_sexes" -> Tbool true | _ -> raise Not_found) ) :: env  in
     Interp.render ~file:"mrg_ind" ~models
   | Geneweb.MergeInd.Error_loop p ->
     let models = ( "error", Data.unsafe_mk_person conf base p ) :: env  in
@@ -411,16 +436,7 @@ let handler =
   { defaultHandler
     with
 
-      mrg = begin fun self conf base ->
-        if conf.wizard then match find_person_in_env conf base "" with
-          | Some p ->
-            let p_auth = authorized_age conf base p in
-            print_mrg conf base p_auth p
-          | _ -> self.very_unknown self conf base
-        else self.incorrect_request self conf base
-      end
-
-    ; _no_mode
+      _no_mode
 
     ; b = begin fun self conf base ->
         if conf.wizard || conf.friend then print_birth conf base
@@ -430,6 +446,12 @@ let handler =
     ; chg_chn = begin fun self conf base ->
         match p_getint conf.env "ip" with
         | Some i -> print_chg_chn conf base (Adef.iper_of_int i)
+        | _ -> self.incorrect_request self conf base
+      end
+
+    ; chg_chn_ok = begin fun self conf base ->
+        match p_getint conf.env "ip" with
+        | Some i -> print_chg_chn_ok conf base (Adef.iper_of_int i)
         | _ -> self.incorrect_request self conf base
       end
 
@@ -479,26 +501,35 @@ let handler =
         print_ll conf base
       end
 
-    ; mrg_ind = begin fun _self conf base ->
-        try match p_getint conf.env "i" with
-          | None -> raise Not_found
-          | Some i ->
-            let ip1 = Adef.iper_of_int i in
-            let ip2 =
-              match p_getint conf.env "i2" with
-              | Some i2 -> Adef.iper_of_int i2
-              | None -> match p_getenv conf.env "select", p_getenv conf.env "n" with
-                | (Some "input" | None), Some n ->
-                  begin match Gutil.person_ht_find_all base n with
-                    | [ip2] -> ip2
-                    | _ -> raise Not_found
-                  end
-                | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
-                | _ -> raise Not_found
-            in
-            print_mrg_ind conf base ip1 ip2
-        with Not_found ->
-          Interp.render ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
+    ; mrg = begin fun self conf base ->
+        if conf.wizard then match find_person_in_env conf base "" with
+          | Some p -> print_mrg conf base p
+          | _ -> self.very_unknown self conf base
+        else self.incorrect_request self conf base
+      end
+
+    ; mrg_ind = begin fun self conf base ->
+        if conf.wizard then
+          try match p_getint conf.env "i" with
+            | None -> raise Not_found
+            | Some i ->
+              let ip1 = Adef.iper_of_int i in
+              let ip2 =
+                match p_getint conf.env "i2" with
+                | Some i2 -> Adef.iper_of_int i2
+                | None -> match p_getenv conf.env "select", p_getenv conf.env "n" with
+                  | (Some "input" | None), Some n ->
+                    begin match Gutil.person_ht_find_all base n with
+                      | [ip2] -> ip2
+                      | _ -> raise Not_found
+                    end
+                  | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
+                  | _ -> raise Not_found
+              in
+              print_mrg_ind conf base ip1 ip2
+          with Not_found ->
+            Interp.render ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
+        else self.incorrect_request self conf base
       end
 
     ; n = begin fun _self conf base ->

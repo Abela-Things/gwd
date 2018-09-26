@@ -1,5 +1,9 @@
 (* TODO: extract useful conf fields and marshal when possible (espacially translation / date) *)
 
+(* TODO:
+   Do not use on_xxx_date: use dates and use template to display it.
+ *)
+
 open Jg_types
 
 let tfun1 name fn =
@@ -199,7 +203,11 @@ and get_n_mk_person conf base (i : Adef.iper) =
   (* TODO: ensure security *)
   (* get_access *)
   (* is_hide_names *)
-  unsafe_mk_person conf base (Util.pget conf base i)
+  let p = Gwdb.poi base i in
+  unsafe_mk_person conf base @@
+  if Util.authorized_age conf base p
+  then p
+  else Gwdb.empty_person base i
 
 and mk_relation conf base r =
   let module E = Ezgw.Relation in
@@ -289,6 +297,11 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let birth_place = get_str (E.birth_place conf base) in
   let burial = get (mk_burial conf) E.burial in
   let burial_place = get_str (E.burial_place conf base) in
+  let children =
+    Jg_runtime.box_lazy @@
+    lazy (Jg_runtime.box_list @@
+          List.map (get_n_mk_person conf base) (E.children base p))
+  in
   let consanguinity = get_float (E.consanguinity) in
   let cop = get_str (Util.child_of_parent conf base) in
   let cremation_place = get_str (E.cremation_place conf base) in
@@ -354,15 +367,16 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     Tlist (List.map Jg_runtime.box_string @@ E.qualifiers base p)
   in
   let related =
-
-    Jg_runtime.box_list @@ []
-    (* List.map (fun (a, b) -> mk_relation conf base (b, None)) @@ (\* FIXME *\)
-     * E.related conf base p *)
+    Jg_runtime.box_lazy @@
+    lazy (Jg_runtime.box_list @@
+          List.map (fun (a, b) -> mk_relation conf base (b, Some a)) @@ (* FIXME? *)
+          E.related conf base p)
   in
   let relations =
-    Jg_runtime.box_list @@ []
-    (* List.map (fun x -> mk_relation conf base (x, None)) @@ (\* FIXME *\)
-     * E.relations p *)
+    Jg_runtime.box_lazy @@
+    lazy (Jg_runtime.box_list @@
+          List.map (fun x -> mk_relation conf base (x, None)) @@ (* FIXME *)
+          E.relations p)
   in
   let sex = get_int E.sex in
   let source_baptism = get_str @@ E.source_baptism base in
@@ -404,6 +418,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "birth_place" -> birth_place
                    | "burial" -> burial
                    | "burial_place" -> burial_place
+                   | "children" -> children
                    | "cop" -> cop
                    | "cremation_place" -> cremation_place
                    | "consanguinity" -> consanguinity
@@ -521,12 +536,12 @@ and mk_gen_title conf base t =
   Tpat (function "t_ident" -> Tstr (Gwdb.sou base t.Def.t_ident)
                | "t_place" -> Tstr (Gwdb.sou base t.t_place)
                | "t_date_start" ->
-                 begin match Adef.od_of_codate t.t_date_start with
+                 begin match Adef.od_of_cdate t.t_date_start with
                    | Some d -> mk_date conf d
                    | None -> Tnull
                  end
                | "t_date_end" ->
-                 begin match Adef.od_of_codate t.t_date_end with
+                 begin match Adef.od_of_cdate t.t_date_end with
                    | Some d -> mk_date conf d
                    | None -> Tnull
                  end
@@ -556,7 +571,7 @@ and mk_burial conf = function
   | Def.UnknownBurial -> Tstr "UnknownBurial"
   | Buried d ->
     let type_ = Tstr "Buried" in
-    let date = match Adef.od_of_codate d with
+    let date = match Adef.od_of_cdate d with
       | Some d -> mk_date conf d
       | None -> Tnull
     in
@@ -565,7 +580,7 @@ and mk_burial conf = function
                  | _ -> raise Not_found)
   | Cremated d ->
     let type_ = Tstr "Cremated" in
-    let date = match Adef.od_of_codate d with
+    let date = match Adef.od_of_cdate d with
       | Some d -> mk_date conf d
       | None -> Tnull
     in
