@@ -264,8 +264,21 @@ and mk_event conf base ((name, _date, _place, _note, _src, _w, _isp) as d) =
                | "spouse" -> spouse
                | _ -> raise Not_found)
 
-and unsafe_mk_person conf base (p : Gwdb.person) =
+and mk_title _conf _base (_nth, _name, _title, _places, _dates) =
+  Tnull
+(* FIXME *)
+  (* let nth = Tint nth in
+   * let name = match name with
+   *   | Tmain
+   *   | Tname str -> sou base n
+   *   | Tnone -> failwith __LOC__
+   * in
+   * let dates =
+   *   List.map
+   *     (fun (start, stop) -> Tnull)
+   *     dates *)
 
+and unsafe_mk_person conf base (p : Gwdb.person) =
   (* match Perso_link.get_father_link conf.command (get_key_index a) with
    * | Some fath ->
    *   let ep = Perso_link.make_ep_link base fath in
@@ -354,6 +367,11 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let max_ancestor_level = Tlazy (lazy (get_int (E.max_ancestor_level conf base) ) ) in
   let mother = mk_parent Gwdb.get_mother in
   let nb_families = get_int (E.nb_families conf) in
+  let nobility_titles =
+    Jg_runtime.box_lazy @@
+    lazy (Jg_runtime.box_list @@
+          List.map (mk_title conf base) @@ E.nobility_titles conf base p)
+  in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
   let on_baptism_date = get_str (E.on_baptism_date conf) in
@@ -407,9 +425,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let surname_aliases = Tlist (List.map Jg_runtime.box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
   let title = get_str (E.title conf base) in
-  (* let nobilityTitles =
-   *   Tlazy (lazy (Tlist (List.map Jg_runtime.box_string @@ E.nobility_titles conf base) ) )
-   * in *)
   Tlazy (lazy (Tpat
                  (function
                    | "access" -> access
@@ -459,6 +474,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "max_ancestor_level" -> max_ancestor_level
                    | "mother" -> mother
                    | "nb_families" -> nb_families
+                   | "nobility_titles" -> nobility_titles
                    | "occ" -> occ
                    | "occupation" -> occupation
                    | "on_baptism_date" -> on_baptism_date

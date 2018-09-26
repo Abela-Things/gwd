@@ -340,7 +340,6 @@ let print_mrg_ind conf base ip1 ip2 =
     Interp.render ~file:"mrg_ind" ~models
 
 let _no_mode self conf base =
-  print_endline __LOC__ ;
   match find_person_in_env conf base "" with
   | Some p ->
     let models =
@@ -359,10 +358,8 @@ let _no_mode self conf base =
       let arbre = ref 2 in
       (* let timeline = ref "0" in *)
       let () =
-        print_endline __LOC__ ;
         match List.assoc_opt "p_mod" conf.env with
         | Some s when String.length s = 18 ->
-          print_endline __LOC__ ;
           let read i = (Char.code @@ String.unsafe_get s i) - 48 in
           assert (String.unsafe_get s 0 = 'i') ;
           etatcivil := read 1 ;
@@ -382,13 +379,12 @@ let _no_mode self conf base =
           sources := read 15 ;
           assert (String.unsafe_get s 16 = 'a') ;
           arbre := read 17 ;
-        | Some _ -> print_endline __LOC__ ; assert false
+        | Some _ -> assert false
         | None ->
           let n =
             try int_of_string @@ List.assoc "module_perso_tplnb" conf.base_env
             with _ -> 0
           in
-          print_endline __LOC__ ;
           for i = 0 to n - 1 do
             try match List.assoc ("module_perso_" ^ string_of_int i) conf.base_env with
               | "arbre_1" -> arbre := 1
