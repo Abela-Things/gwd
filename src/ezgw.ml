@@ -483,12 +483,14 @@ module Person = struct
       in
       loop events 0 0 0 0 0
 
-  let has_families conf p =
-    Array.length (get_family p) > 0 ||
-    List.length
-      (Perso_link.get_family_correspondance conf.command
-         (get_key_index p)) >
-    0
+  let nb_families conf p =
+    match env.p_link with
+    | Some _ ->
+      List.length (Perso_link.get_family_correspondance conf.command (get_key_index p))
+    | _ ->
+      Array.length (get_family p)
+
+  let has_families conf p = nb_families conf p > 0
 
   let has_first_names_aliases p =
     get_first_names_aliases p <> []
@@ -811,14 +813,6 @@ module Person = struct
             0 (Array.to_list (get_family p))
         in
         string_of_int n
-
-  let nb_families conf p =
-    match env.p_link with
-    | Some _ ->
-      List.length
-        (Perso_link.get_family_correspondance conf.command
-           (get_key_index p))
-    | _ -> Array.length (get_family p)
 
   let nobility_titles conf base p =
     Perso.nobility_titles_list conf base p

@@ -211,13 +211,14 @@ and get_n_mk_person conf base (i : Adef.iper) =
 
 and mk_relation conf base r =
   let module E = Ezgw.Relation in
-  let has_relation_her = Tbool (E.has_relation_her r) in
-  let has_relation_him = Tbool (E.has_relation_her r) in
-  let related = mk_related conf base @@ E.related r in
-  let related_type = Tstr (E.related_type conf r) in
-  let relation_type = Tstr (E.relation_type conf r) in
-  let relation_her = mk_related conf base @@ E.relation_her r in
-  let relation_him = mk_related conf base @@ E.relation_him r in
+  let get wrap fn = try wrap (fn r) with Not_found -> Tnull in
+  let has_relation_her = get Jg_runtime.box_bool E.has_relation_her in
+  let has_relation_him = get Jg_runtime.box_bool E.has_relation_him in
+  let related = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.related r in
+  let related_type = get Jg_runtime.box_string (E.related_type conf) in
+  let relation_type = get Jg_runtime.box_string (E.relation_type conf) in
+  let relation_her = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_her r in
+  let relation_him = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_him r in
   Tpat (function
       | "has_relation_her" -> has_relation_her
       | "has_relation_him" -> has_relation_him
