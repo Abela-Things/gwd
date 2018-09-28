@@ -1042,7 +1042,6 @@ let mk_count () =
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
-  let bvar = Jg_runtime.jg_obj_lookup conf_env "base_env" in
   (* let initCache = Tfun (fun args _ -> match args with
    *     | [ p ; Tint nb_asc ; Tint from_gen_desc ; Tint nb_desc ] ->
    *       Geneweb.Perso_link.init_cache
@@ -1054,7 +1053,6 @@ let default_env conf base (* p *) =
   ("conf", conf_env)
   :: ("i18n", mk_i18n conf)
   :: ("env", mk_env conf)
-  :: ("bvar", bvar)
   :: ("evar", evar)
   (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
