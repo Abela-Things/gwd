@@ -421,7 +421,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     Jg_runtime.box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
   in
-  let surameKeyVal = get_str (E.surname_key_val base) in
+  let surame_key_val = get_str (E.surname_key_val base) in
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map Jg_runtime.box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
@@ -499,7 +499,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "surname" -> surname
                    | "surname_aliases" -> surname_aliases
                    | "surname_key" -> surname_key
-                   | "surame_key_val" -> surameKeyVal
+                   | "surame_key_val" -> surame_key_val
                    | "title" -> title
                    | "sex" -> sex
                    | "__str__" -> str__
