@@ -7,7 +7,7 @@
 open Jg_types
 
 let tfun1 name fn =
-  Tfun (fun args _ -> match args with [ Tstr a ]-> fn a | _ -> failwith name)
+  Tfun (fun ?kwargs:_ -> function [ Tstr a ]-> fn a | _ -> failwith name)
 
 let mk_opt fn = function None -> Tnull | Some x -> fn x
 
@@ -93,7 +93,7 @@ and date_compare =
      (Jg_runtime.jg_obj_lookup d1 field)
      (Jg_runtime.jg_obj_lookup d2 field)
   in
-  Tfun (fun args _ -> match args with
+  Tfun (fun ?kwargs:_ args -> match args with
       | [ d1 ; d2 ] ->
         begin match compare "year" d1 d2 with
           | 0 -> begin match compare "month" d1 d2 with
@@ -184,12 +184,12 @@ and date_module conf =
   in
 
   let string_of_ondate =
-    Jg_runtime.box_fun @@ fun args _ ->
+    Jg_runtime.box_fun @@ fun ?kwargs:_ args ->
     Tstr (Date.string_of_ondate conf @@ convert @@ List.hd args)
   in
   let string_of_date_sep =
-    Jg_runtime.box_fun @@ function
-    | [ date ; Tstr sep ] -> fun _ -> Tstr (Date.string_of_date_sep conf sep @@ convert date)
+    Jg_runtime.box_fun @@ fun ?kwargs:_ -> function
+    | [ date ; Tstr sep ] -> Tstr (Date.string_of_date_sep conf sep @@ convert date)
     | _ -> assert false
   in
   Tpat (function
@@ -511,7 +511,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
 (* FIXME *)
 and mk_source _s =
   let source_type = Tstr "" in
-  let str__ = Tfun (fun _ _ -> Tstr "") in
+  let str__ = Tfun (fun ?kwargs:_ _ -> Tstr "") in
   Tpat (function
       | "source_type" -> source_type
       | "__str__" -> str__
@@ -958,7 +958,7 @@ let mk_i18n conf =
   Tstr (Templ.eval_transl conf false s c)
 
 let string_of_death conf =
-  Tfun (fun args _ -> match args with
+  Tfun (fun ?kwargs:_ args -> match args with
 
       | [ Tstr "DeadYoung" ; Tint sex ] -> Tstr (Util.transl_nth conf "died young" sex)
       | [ Tstr "DeadDontKnowWhen" ; Tint sex ]-> Tstr (Util.transl_nth conf "died" sex)
@@ -975,34 +975,34 @@ let string_of_death conf =
 (* TODO: remove base *)
 let translate conf (* base *) =
   let decline =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr s1 ; Tstr s2 ] -> Tstr (Util.transl_decline conf s1 s2)
         | _ -> assert false
       )
   in
   let nth =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr s ; Tint i ] -> Tstr (Util.transl_nth conf s i)
         | [ Tstr s ; Tstr i ] -> Tstr (Util.transl_nth conf s @@ int_of_string i)
         | _ -> assert false)
   in
   let transl_a_of_b =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr x ; Tstr y ] -> Tstr (Util.transl_a_of_b conf x y)
         | _ -> assert false)
   in
   let transl_a_of_gr_eq_gen_lev =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr x ; Tstr y ] -> Tstr (Util.transl_a_of_gr_eq_gen_lev conf x y)
         | _ -> assert false)
   in
   let transl =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr x ] -> Tstr (Util.transl conf x)
         | _ -> assert false)
   in
   let ftransl =
-    Tfun (fun arg _ -> match arg with
+    Tfun (fun ?kwargs:_ -> function
         | [ Tstr s ; Tint i ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
         | [ Tstr s ; Tstr s' ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
         | Tstr s :: _ -> failwith s
@@ -1042,7 +1042,7 @@ let mk_count () =
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
-  (* let initCache = Tfun (fun args _ -> match args with
+  (* let initCache = Tfun (fun ?kwargs:_ args -> match args with
    *     | [ p ; Tint nb_asc ; Tint from_gen_desc ; Tint nb_desc ] ->
    *       Geneweb.Perso_link.init_cache
    *         conf base (Gwdb.get_key_index p) nb_asc from_gen_desc nb_desc ;
@@ -1060,9 +1060,11 @@ let default_env conf base (* p *) =
   :: ("translate", translate conf)
   :: ("Date", date_module conf)
   :: ("string_of_death", string_of_death conf)
-  :: ("eq_dates", Tfun (function [ Tpat d1 ; Tpat d2 ] -> fun _ -> Tbool (d1 "day" = d2 "day"
-                                                                          && d1 "month" = d2 "month"
-                                                                          && d1 "year" = d2 "year")
-                               | _ -> fun _ -> Tbool false)
+  :: ("eq_dates", Tfun (fun ?kwargs:_ -> function
+      |  [ Tpat d1 ; Tpat d2 ] ->
+        Tbool (d1 "day" = d2 "day"
+               && d1 "month" = d2 "month"
+               && d1 "year" = d2 "year")
+      | _ -> Tbool false)
     )
   :: mk_count ()

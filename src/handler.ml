@@ -312,7 +312,7 @@ let print_mrg_ind conf base ip1 ip2 =
                      | "p1" -> p1
                      | "p2" -> p2
                      | _ -> raise Not_found ) )
-      :: ( "string_of_burial", Tfun (fun _ _ -> Tnull))
+      :: ( "string_of_burial", Tfun (fun ?kwargs:_ _ -> Tnull))
       :: env
     in
     Interp.render ~file:"mrg_ind" ~models
