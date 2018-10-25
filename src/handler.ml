@@ -232,12 +232,17 @@ let print_mrg conf base p =
   in
   Interp.render ~file:"mrg" ~models
 
-let print_names conf base is_surnames need_whole_list =
+let print_names conf base is_surnames all =
   let mode = if is_surnames then "N" else "P" in
   let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
   let list =
-    List.map (fun (_k, s, cnt) -> Tset [ Tstr s ; Tint cnt ]) @@ fst @@
-    Alln.select_names conf base is_surnames ini need_whole_list
+    List.map (fun (k, s, cnt) ->
+        let str = Tstr (Alln.alphab_string base is_surnames s) in
+        let cnt = Tint cnt in
+        let key = Tstr k in
+        Tpat (function "key" -> key | "label" -> str | "count" -> cnt | _ -> raise Not_found)) @@
+    fst @@
+    Alln.select_names conf base is_surnames ini all
   in
   let models =
     ("list", Tlist list)
@@ -270,7 +275,7 @@ let print_alphabetic conf base is_surnames =
     in
     Interp.render ~file:"names_alphabetic_big_header" ~models
   end else begin
-    let all = p_getenv conf.env "o" =  Some "A" in
+    let all = p_getenv conf.env "o" = Some "A" in
     print_names conf base is_surnames all
   end ;
   if load_strings then clear_strings_array base

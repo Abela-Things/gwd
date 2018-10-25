@@ -1021,7 +1021,7 @@ let decode_varenv =
   tfun1 "decode_varenv" @@ fun str -> Tstr (Wserver.decode str)
 
 let code_varenv =
-  tfun1 "decode_varenv" @@ fun str -> Tstr (Wserver.encode str)
+  tfun1 "code_varenv" @@ fun str -> Tstr (Wserver.encode str)
 
 (* let languageName conf =
  *   tfun1 "languageName" @@
@@ -1046,6 +1046,13 @@ let mk_base base =
       | "nb_of_families" -> Tint (Gwdb.nb_of_families base)
       | _ -> raise Not_found
     )
+
+(* FIXME: move it into jingoo *)
+let forall = Tfun (fun ?kwargs:_ -> function
+    | [ Tlist l ; Tfun fn ] -> Tbool (List.for_all (fun x -> Jg_runtime.unbox_bool @@ fn [x]) l)
+    | [ Tarray l ; Tfun fn ] -> Tbool (Array.for_all (fun x -> Jg_runtime.unbox_bool @@ fn [x]) l)
+    | _ -> assert false
+  )
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
@@ -1076,4 +1083,5 @@ let default_env conf base (* p *) =
       | _ -> Tbool false)
     )
   :: ("base", mk_base base)
+  :: ("forall", forall)
   :: mk_count ()
