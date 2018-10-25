@@ -16,6 +16,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
   let get_str = get Jg_runtime.box_string in
   let get_bool = get Jg_runtime.box_bool in
+  let get_int = get Jg_runtime.box_int in
   let f = E.father fcd in
   let m = E.mother fcd in
   let divorce_date = get_str (E.divorce_date conf) in
@@ -42,6 +43,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let are_not_married = get_bool E.are_not_married in
   let is_no_mention = get_bool E.is_no_mention in
   let is_no_sexes_check = get_bool E.is_no_sexes_check in
+  let ifam = get_int E.ifam in
   let has_witnesses = get_bool E.has_witnesses in
   let witnesses =
     Tlazy (lazy (get Jg_runtime.box_array @@
@@ -59,6 +61,7 @@ let rec mk_family (conf : Config.config) base fcd =
       | "children" -> children
       | "father" -> father
       | "has_witnesses" -> has_witnesses
+      | "ifam" -> ifam
       | "is_no_mention" -> is_no_mention
       | "is_no_sexes_check" -> is_no_sexes_check
       | "marriage_date" -> marriage_date
@@ -348,7 +351,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let has_relations = get_bool (E.has_relations conf base) in
   let has_siblings = get_bool (E.has_siblings conf base) in
   let image_url = get_str (fun p -> E.image_url conf base p) in
-  let index = get_str E.index in
   let iper = Tint (Adef.int_of_iper iper') in
   let is_birthday = get_bool (E.is_birthday conf) in
   let is_buried = get_bool (E.is_buried) in
@@ -458,7 +460,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "has_relations" -> has_relations
                    | "has_siblings" -> has_siblings
                    | "image_url" -> image_url
-                   | "index" -> index
                    | "iper" -> iper
                    | "is_birthday" -> is_birthday
                    | "is_buried" -> is_buried
@@ -802,7 +803,6 @@ let mk_conf conf base =
   let authorized_wizards_notes = Tbool conf.authorized_wizards_notes in
   let public_if_titles = Tbool conf.public_if_titles in
   let public_if_no_date = Tbool conf.public_if_no_date in
-  let cancel_links = Tvolatile (fun () -> Tbool conf.cancel_links) in
   let setup_link = Tvolatile (fun () -> Tbool conf.setup_link) in
   let accessByKey = Tbool conf.access_by_key in
   let private_years = Tint conf.private_years in
@@ -851,7 +851,6 @@ let mk_conf conf base =
       | "bname" -> bname
       | "border" -> border
       | "can_send_image" -> can_send_image
-      | "cancel_links" -> cancel_links
       | "cgi_passwd" -> cgi_passwd
       | "charset" -> charset
       | "command" -> command

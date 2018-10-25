@@ -595,10 +595,6 @@ module Person = struct
     (* deprecated since 5.00: rather use "i=%index;" *)
     "i=" ^ string_of_int (Adef.int_of_iper (get_key_index p))
 
-  let index p =
-    (* FIXME *)
-    (* if get_env env.p_link then "" else *) string_of_int (Adef.int_of_iper (get_key_index p))
-
   let is_accessible_by_key conf base p =
     Util.accessible_by_key
       conf base p (p_first_name base p) (p_surname base p)
@@ -1269,7 +1265,7 @@ module Family = struct
   let has_witnesses (_, fam, _, m_auth) =
     m_auth && Array.length (get_witnesses fam) > 0
 
-  let index (ifam, _, _, _) =
+  let ifam (ifam, _, _, _) =
     Adef.int_of_ifam ifam
 
   let is_no_mention (_, fam, _, _) =

@@ -232,62 +232,54 @@ let print_mrg conf base p =
   in
   Interp.render ~file:"mrg" ~models
 
-let alln_select conf base is_surnames ini need_whole_list =
-  (* Do not alway load *)
-  let () = load_strings_array base in
-  let (list, _, _) = Alln.select_names conf base is_surnames ini need_whole_list in
-  let () = clear_strings_array base in
-  list
-
-let print_frequency conf base is_surnames =
+let print_names conf base is_surnames need_whole_list =
+  let mode = if is_surnames then "N" else "P" in
+  let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
   let list =
-    List.map (fun (_k, s, c) ->
-        (* let key = Tstr k in *)
-        let value = Tstr s in
-        let count = Tint c in
-        (* let alphab_string = Tstr (Alln.alphab_string base is_surnames s) in *)
-        Tpat (function
-            (* | "key" -> key *)
-            | "value" -> value
-            | "count" -> count
-            (* | "alphab_string" -> alphab_string *)
-            | _ -> raise Not_found) )
-      (alln_select conf base is_surnames "" true)
+    List.map (fun (_k, s, cnt) -> Tset [ Tstr s ; Tint cnt ]) @@ fst @@
+    Alln.select_names conf base is_surnames ini need_whole_list
   in
   let models =
     ("list", Tlist list)
+    :: ("ini", Tstr ini)
+    :: ("mode", Tstr mode)
     :: Data.default_env conf base
   in
-  Interp.render ~file:"frequency" ~models
+  Interp.render ~file:"names_alphabetic" ~models
 
-let print_short conf base is_surnames =
-  let ini =
-    match p_getenv conf.env "k" with
-    | Some k -> k
-    | _ -> ""
-  in
-  let list =
-    List.map (fun (_k, s, _c) ->
-        let value = Tstr s in
-        let first_letter = Tstr (String.make 1 (String.get s 0) ) in
-        Tpat (function
-            | "__str__" -> value
-            | "first_letter" -> first_letter
-            | _ -> raise Not_found) )
-      (alln_select conf base is_surnames ini true)
-  in
-  let models =
-    ("list", Tlist list)
-    :: Data.default_env conf base
-  in
-  Interp.render ~file:"names_alphabetic_short" ~models
+let print_alphabetic conf base is_surnames =
+  let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
+  let fast = p_getenv conf.base_env "fast_alphabetic" = Some "yes" && ini = "" in
+  let load_strings = fast || String.length ini < 2 in
+  let _ = if load_strings then load_strings_array base in
+  if fast then begin
+    let mode = if is_surnames then "N" else "P" in
+    let list =
+      let rec loop list c =
+        let list = Tstr (String.make 1 c) :: list in
+        if c = 'A' then list
+        else loop list (Char.chr (Char.code c - 1))
+      in
+      loop [] 'Z'
+    in
+    let models =
+      ("list", Tlist list)
+      :: ("ini", Tstr ini)
+      :: ("mode", Tstr mode)
+      :: Data.default_env conf base
+    in
+    Interp.render ~file:"names_alphabetic_big_header" ~models
+  end else begin
+    let all = p_getenv conf.env "o" =  Some "A" in
+    print_names conf base is_surnames all
+  end ;
+  if load_strings then clear_strings_array base
 
 let print_alln conf base surname =
   match p_getenv conf.env "tri" with
-  | Some "F" -> print_frequency conf base surname
-  | Some "S" -> print_short conf base surname
-  | _ -> failwith __LOC__
-  (* | _ -> print_alphabetic conf base surname *)
+  | Some "F" -> print_names conf base surname true
+  | Some "S" -> print_names conf base surname true
+  | _ -> print_alphabetic conf base surname
 
 let print_mrg_ind conf base ip1 ip2 =
   let p1 = Gwdb.poi base ip1 in
@@ -533,9 +525,7 @@ let handler =
     ; n = begin fun _self conf base ->
         match p_getenv conf.env "v" with
         | Some v -> Some.surname_print conf base Some.surname_not_found v
-        | _ ->
-          let () = load_persons_array base in
-          print_alln conf base true
+        | _ -> print_alln conf base true
       end
 
     ; oa = begin restricted_friend @@ fun _self conf base ->
@@ -546,11 +536,11 @@ let handler =
         print_oe conf base
       end
 
-    (* ; p = begin fun _self conf base ->
-     *     match p_getenv conf.env "v" with
-     *     | Some v -> Some.first_name_print conf base v
-     *     | None -> print_alln conf base false
-     *   end *)
+    ; p = begin fun _self conf base ->
+        match p_getenv conf.env "v" with
+        | Some v -> Some.first_name_print conf base v
+        | None -> print_alln conf base false
+      end
 
     ; pop_pyr = begin restricted_friend @@ fun _self conf base ->
         print_pop_pyr conf base
