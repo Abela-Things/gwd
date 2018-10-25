@@ -904,6 +904,7 @@ let mk_env conf =
   let commit = Tstr Compilation.commit in
   let commit_date = Tstr (Date.string_of_date conf Compilation.commit_date) in
   let doctype = Tstr (Util.doctype conf) in
+  let get = Tpat (fun x -> Tstr (List.assoc x conf.env)) in
   let highlight = Tstr (conf.Config.highlight) in
   let image_prefix = Tstr (Util.image_prefix conf) in
   let prefix = Tstr (Util.commd conf) in
@@ -936,6 +937,7 @@ let mk_env conf =
       | "commit" -> commit
       | "commit_date" -> commit_date
       | "doctype" -> doctype
+      | "get" -> get
       | "highlight" -> highlight
       | "image_prefix" -> image_prefix
       | "prefix" -> prefix
