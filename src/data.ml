@@ -1038,6 +1038,13 @@ let mk_count () =
   ; ( "reset_count", Tvolatile (fun () -> count := 0 ; Tnull ) )
   ]
 
+let mk_base base =
+  Tpat (function
+      | "nb_of_persons" -> Tint (Gwdb.nb_of_persons base)
+      | "nb_of_families" -> Tint (Gwdb.nb_of_families base)
+      | _ -> raise Not_found
+    )
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1066,4 +1073,5 @@ let default_env conf base (* p *) =
                && d1 "year" = d2 "year")
       | _ -> Tbool false)
     )
+  :: ("base", mk_base base)
   :: mk_count ()
