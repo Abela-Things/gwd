@@ -98,9 +98,9 @@ and date_compare =
   in
   Tfun (fun ?kwargs:_ args -> match args with
       | [ d1 ; d2 ] ->
-        begin match compare "year" d1 d2 with
-          | 0 -> begin match compare "month" d1 d2 with
-              | 0 -> Tint (compare "day" d1 d2)
+        begin match Jg_runtime.unbox_int @@ compare "year" d1 d2 with
+          | 0 -> begin match Jg_runtime.unbox_int @@ compare "month" d1 d2 with
+              | 0 -> compare "day" d1 d2
               | c -> Tint c
             end
           | c -> Tint c

@@ -232,40 +232,28 @@ let print_mrg conf base p =
   in
   Interp.render ~file:"mrg" ~models
 
-let print_names conf base is_surnames all =
-  let mode = if is_surnames then "N" else "P" in
+let print_alln conf base is_surnames =
   let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
-  let list =
-    List.map (fun (k, s, cnt) ->
-        let str = Tstr (Alln.alphab_string base is_surnames s) in
-        let cnt = Tint cnt in
-        let key = Tstr k in
-        Tpat (function "key" -> key | "label" -> str | "count" -> cnt | _ -> raise Not_found)) @@
-    fst @@
-    Alln.select_names conf base is_surnames ini all
-  in
-  let models =
-    ("list", Tlist list)
-    :: ("ini", Tstr ini)
-    :: ("mode", Tstr mode)
-    :: Data.default_env conf base
-  in
-  Interp.render ~file:"names_alphabetic" ~models
-
-let print_alphabetic conf base is_surnames =
-  let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
-  let fast = p_getenv conf.base_env "fast_alphabetic" = Some "yes" && ini = "" in
-  let load_strings = fast || String.length ini < 2 in
-  let _ = if load_strings then load_strings_array base in
-  if fast then begin
+  if String.length ini < 2 && (Gwdb.nb_of_persons base / 10) > 2000
+  then Interp.render ~file:"names_alphabetic_fallback" ~models:(Data.default_env conf base)
+  else begin
     let mode = if is_surnames then "N" else "P" in
+    let load_strings = String.length ini < 2 in
+    let all =
+      (* p_getenv conf.env "tri" <> Some "F"
+         && p_getenv conf.env "tri" <> Some "S"
+         && p_getenv conf.env "o" = Some "A" *)
+      true
+    in
+    if load_strings then load_strings_array base ;
     let list =
-      let rec loop list c =
-        let list = Tstr (String.make 1 c) :: list in
-        if c = 'A' then list
-        else loop list (Char.chr (Char.code c - 1))
-      in
-      loop [] 'Z'
+      List.map (fun (k, s, cnt) ->
+          let str = Tstr (Alln.alphab_string base is_surnames s) in
+          let cnt = Tint cnt in
+          let key = Tstr k in
+          Tpat (function "key" -> key | "label" -> str | "count" -> cnt | _ -> raise Not_found)) @@
+      fst @@
+      Alln.select_names conf base is_surnames ini all
     in
     let models =
       ("list", Tlist list)
@@ -273,18 +261,9 @@ let print_alphabetic conf base is_surnames =
       :: ("mode", Tstr mode)
       :: Data.default_env conf base
     in
-    Interp.render ~file:"names_alphabetic_big_header" ~models
-  end else begin
-    let all = p_getenv conf.env "o" = Some "A" in
-    print_names conf base is_surnames all
-  end ;
-  if load_strings then clear_strings_array base
-
-let print_alln conf base surname =
-  match p_getenv conf.env "tri" with
-  | Some "F" -> print_names conf base surname true
-  | Some "S" -> print_names conf base surname true
-  | _ -> print_alphabetic conf base surname
+    Interp.render ~file:"names_alphabetic" ~models ;
+    if load_strings then clear_strings_array base
+  end
 
 let print_mrg_ind conf base ip1 ip2 =
   let p1 = Gwdb.poi base ip1 in
