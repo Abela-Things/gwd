@@ -134,10 +134,7 @@ module Person = struct
   let burial_note conf base p =
     mk_note conf base p (get_burial_note p)
 
-  let children base p =
-    Array.fold_right
-      (fun ifam -> Array.fold_right List.cons (get_children @@ foi base ifam) )
-      (get_family p) []
+  let children base p = ChangeChildren.select_children_of base p
 
   (* let child conf base p =
    *   match get_env "child" env with

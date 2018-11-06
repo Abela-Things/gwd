@@ -158,8 +158,10 @@ let print_pop_pyr conf base =
   Interp.render ~file:"pop_pyr" ~models
 
 let print_chg_chn conf base ip =
+  let digest = ChangeChildren.digest_children base (Ezgw.Person.children base @@ Gwdb.poi base ip) in
   let models =
-    ("ind", Data.get_n_mk_person conf base ip)
+    ("digest", Tstr digest)
+    :: ("ind", Data.get_n_mk_person conf base ip)
     :: Data.default_env conf base
   in
   Interp.render ~file:"chg_chn" ~models
@@ -168,27 +170,24 @@ let print_chg_chn_ok conf base ip =
   try
     if p_getenv conf.env "return" <> None then print_chg_chn conf base ip
     else
-      begin
-        let p = Gwdb.poi base ip in
-        let ipl = Ezgw.Person.children base p in
-        let parent_surname = p_surname base p in
-        ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
-        let changed =
-          try ChangeChildren.change_children conf base parent_surname ipl
-          with ChangeChildren.FirstNameMissing _ip -> failwith "TODO"
-        in
-        Util.commit_patches conf base;
-        let changed =
-          U_Change_children_name
-            (Util.string_gen_person base (gen_person_of_person p), changed)
-        in
-        History.record conf base changed "cn";
-        let models =
-          ("ind", Data.get_n_mk_person conf base ip)
-          :: Data.default_env conf base
-        in
-        Interp.render ~file:"chg_chn_ok" ~models
-      end
+      let models =
+        try
+          let p = Gwdb.poi base ip in
+          let ipl = Ezgw.Person.children base p in
+          ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
+          let parent_surname = p_surname base p in
+          let changed = ChangeChildren.change_children conf base parent_surname ipl in
+          Util.commit_patches conf base;
+          let changed =
+            U_Change_children_name
+              (Util.string_gen_person base (gen_person_of_person p), changed)
+          in
+          History.record conf base changed "cn";
+          ("ind", Data.get_n_mk_person conf base ip) :: Data.default_env conf base
+        with ChangeChildren.FirstNameMissing _ip ->
+          ("error", Tbool true) :: Data.default_env conf base
+      in
+      Interp.render ~file:"chg_chn_ok" ~models
   with Update.ModErr -> ()      (* FIXME? *)
 
 let print_d self conf base ip =
@@ -234,17 +233,16 @@ let print_mrg conf base p =
 
 let print_alln conf base is_surnames =
   let ini = match p_getenv conf.env "k" with Some k -> k | _ -> "" in
-  if String.length ini < 2 && (Gwdb.nb_of_persons base / 10) > 2000
+  let all =
+    p_getenv conf.env "tri" <> Some "F"
+    && p_getenv conf.env "tri" <> Some "S"
+    && p_getenv conf.env "o" = Some "A"
+  in
+  if ini = "" && (Gwdb.nb_of_persons base / 10) > 2000 && not all
   then Interp.render ~file:"names_alphabetic_fallback" ~models:(Data.default_env conf base)
   else begin
     let mode = if is_surnames then "N" else "P" in
     let load_strings = String.length ini < 2 in
-    let all =
-      (* p_getenv conf.env "tri" <> Some "F"
-         && p_getenv conf.env "tri" <> Some "S"
-         && p_getenv conf.env "o" = Some "A" *)
-      true
-    in
     if load_strings then load_strings_array base ;
     let list =
       List.map (fun (k, s, cnt) ->

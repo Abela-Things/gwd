@@ -813,9 +813,9 @@ let mk_conf conf base =
   let bname = Tstr conf.bname in
   let cgi_passwd = Tstr conf.cgi_passwd in
   let env = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.env) in
-  let senv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.senv) in
-  let henv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.henv) in
-  let benv = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env) in
+  let senv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.senv))) in
+  let henv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.henv))) in
+  let benv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env))) in
   let allowed_titles =
     Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.allowed_titles) ) ) )
   in
