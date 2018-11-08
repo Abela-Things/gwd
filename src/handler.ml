@@ -6,6 +6,7 @@ open Def
 open Gwdb
 open Util
 
+open Jingoo
 open Jg_types
 
 let birth_death_aux_fam conf base fn bool =
@@ -151,8 +152,8 @@ let print_pop_pyr conf base =
     :: ("interval", Tint interval)
     :: ("limit", Tint limit)
     :: ("year", Tint at_date.year)
-    :: ("men", Tarray (Array.map Jg_runtime.box_int men))
-    :: ("wom", Tarray (Array.map Jg_runtime.box_int wom))
+    :: ("men", Tarray (Array.map box_int men))
+    :: ("wom", Tarray (Array.map box_int wom))
     :: Data.default_env conf base
   in
   Interp.render ~file:"pop_pyr" ~models
@@ -526,6 +527,21 @@ let handler =
 
     ; pop_pyr = begin restricted_friend @@ fun _self conf base ->
         print_pop_pyr conf base
+      end
+
+    ; fallback = begin fun mode _self conf base ->
+        match mode with
+        | "TIMELINE" ->
+          begin match find_person_in_env conf base "" with
+            | Some p ->
+              let models =
+                ("ind", Data.get_n_mk_person conf base (Gwdb.get_key_index p) )
+                :: Data.default_env conf base
+              in
+              Interp.render ~file:"perso_module/timeline_1" ~models
+            | _ -> assert false
+          end
+        | _ -> assert false
       end
 
   }

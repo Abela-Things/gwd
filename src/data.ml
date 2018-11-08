@@ -4,6 +4,7 @@
    Do not use on_xxx_date: use dates and use template to display it.
  *)
 
+open Jingoo
 open Jg_types
 
 let tfun1 name fn =
@@ -14,9 +15,9 @@ let mk_opt fn = function None -> Tnull | Some x -> fn x
 let rec mk_family (conf : Config.config) base fcd =
   let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
-  let get_str = get Jg_runtime.box_string in
-  let get_bool = get Jg_runtime.box_bool in
-  let get_int = get Jg_runtime.box_int in
+  let get_str = get box_string in
+  let get_bool = get box_bool in
+  let get_int = get box_int in
   let f = E.father fcd in
   let m = E.mother fcd in
   let divorce_date = get_str (E.divorce_date conf) in
@@ -46,7 +47,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let ifam = get_int E.ifam in
   let has_witnesses = get_bool E.has_witnesses in
   let witnesses =
-    Tlazy (lazy (get Jg_runtime.box_array @@
+    Tlazy (lazy (get box_array @@
                  fun fcd -> Array.map (get_n_mk_person conf base) @@
                  E.witnesses fcd))
   in
@@ -98,8 +99,8 @@ and date_compare =
   in
   Tfun (fun ?kwargs:_ args -> match args with
       | [ d1 ; d2 ] ->
-        begin match Jg_runtime.unbox_int @@ compare "year" d1 d2 with
-          | 0 -> begin match Jg_runtime.unbox_int @@ compare "month" d1 d2 with
+        begin match unbox_int @@ compare "year" d1 d2 with
+          | 0 -> begin match unbox_int @@ compare "month" d1 d2 with
               | 0 -> compare "day" d1 d2
               | c -> Tint c
             end
@@ -163,7 +164,7 @@ and date_module conf =
     | Tstr s -> Def.Dtext s
     | Tpat x ->
       let prec =
-        match Jg_runtime.unbox_string @@ x "prec" with
+        match unbox_string @@ x "prec" with
         | "sure" -> Def.Sure
         | "about" -> About
         | "maybe" -> Maybe
@@ -171,11 +172,11 @@ and date_module conf =
         | "after" -> After
         | _ -> assert false
       in
-      let day = Jg_runtime.unbox_int @@ x "day" in
-      let month = Jg_runtime.unbox_int @@ x "month" in
-      let year = Jg_runtime.unbox_int @@ x "year" in
-      let delta = Jg_runtime.unbox_int @@ x "delta" in
-      let calendar = match Jg_runtime.unbox_string @@ x "calendar" with
+      let day = unbox_int @@ x "day" in
+      let month = unbox_int @@ x "month" in
+      let year = unbox_int @@ x "year" in
+      let delta = unbox_int @@ x "delta" in
+      let calendar = match unbox_string @@ x "calendar" with
         | "Dgregorian" -> Def.Dgregorian
         | "Djulian" -> Djulian
         | "Dfrench" -> Dfrench
@@ -187,11 +188,11 @@ and date_module conf =
   in
 
   let string_of_ondate =
-    Jg_runtime.box_fun @@ fun ?kwargs:_ args ->
+    box_fun @@ fun ?kwargs:_ args ->
     Tstr (Date.string_of_ondate conf @@ convert @@ List.hd args)
   in
   let string_of_date_sep =
-    Jg_runtime.box_fun @@ fun ?kwargs:_ -> function
+    box_fun @@ fun ?kwargs:_ -> function
     | [ date ; Tstr sep ] -> Tstr (Date.string_of_date_sep conf sep @@ convert date)
     | _ -> assert false
   in
@@ -215,11 +216,11 @@ and get_n_mk_person conf base (i : Adef.iper) =
 and mk_relation conf base r =
   let module E = Ezgw.Relation in
   let get wrap fn = try wrap (fn r) with Not_found -> Tnull in
-  let has_relation_her = get Jg_runtime.box_bool E.has_relation_her in
-  let has_relation_him = get Jg_runtime.box_bool E.has_relation_him in
+  let has_relation_her = get box_bool E.has_relation_her in
+  let has_relation_him = get box_bool E.has_relation_him in
   let related = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.related r in
-  let related_type = get Jg_runtime.box_string (E.related_type conf) in
-  let relation_type = get Jg_runtime.box_string (E.relation_type conf) in
+  let related_type = get box_string (E.related_type conf) in
+  let relation_type = get box_string (E.relation_type conf) in
   let relation_her = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_her r in
   let relation_him = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_him r in
   Tpat (function
@@ -246,26 +247,34 @@ and mk_related conf base r =
       | _ -> raise Not_found
     )
 
-and mk_event conf base ((name, _date, _place, _note, _src, _w, _isp) as d) =
+and mk_event conf base d =
   let module E = Ezgw.Event in
-  let date =
-    match E.date d with
-    | Some d -> mk_date conf d
-    | None -> Tnull
-  in
-  let name = match name with
-    | Geneweb.Perso.Pevent name -> Tstr (Util.string_of_pevent_name conf base name)
-    | Fevent name -> Tstr (Util.string_of_fevent_name conf base name)
-  in
+  let date = match E.date d with Some d -> mk_date conf d | None -> Tnull in
+  let name = Tstr (E.name conf base d)  in
   let spouse =
     Tlazy (lazy (try unsafe_mk_person conf base @@ E.spouse base d
                  with Not_found -> Tnull))
   in
-  let place = Tnull in
+  let witnesses =
+    Tlazy (lazy (Tarray (Array.map (fun (i, k) ->
+        let p = get_n_mk_person conf base i in
+        let unbox p = unbox_pat (Lazy.force (unbox_lazy p)) in
+        let sex = Ezgw.sex_of_index @@ unbox_int @@ unbox p @@ "sex" in
+        let k = Util.string_of_witness_kind conf sex k in
+        Tpat (function "kind" -> Tstr k
+                     | s -> (unbox p) s) )
+        (E.witnesses d) ) ) )
+  in
+  let place = Tstr (E.place conf base d) in
+  let src = Tstr (E.src base d) in
+  let note = Tstr (E.note base d) in
   Tpat (function "date" -> date
                | "name" -> name
+               | "note" -> note
                | "place" -> place
                | "spouse" -> spouse
+               | "src" -> src
+               | "witnesses" -> witnesses
                | _ -> raise Not_found)
 
 and mk_title _conf _base (_nth, _name, _title, _places, _dates) =
@@ -283,6 +292,7 @@ and mk_title _conf _base (_nth, _name, _title, _places, _dates) =
    *     dates *)
 
 and unsafe_mk_person conf base (p : Gwdb.person) =
+  print_endline __LOC__ ;
   (* match Perso_link.get_father_link conf.command (get_key_index a) with
    * | Some fath ->
    *   let ep = Perso_link.make_ep_link base fath in
@@ -292,10 +302,10 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
    * | None ->
    *   warning_use_has_parents_before_parent loc "father" (str_val "") *)
   let get wrap fn = try wrap (fn p) with Not_found -> Tnull in
-  let get_str = get Jg_runtime.box_string in
-  let get_bool = get Jg_runtime.box_bool in
-  let get_int = get Jg_runtime.box_int in
-  let get_float = get Jg_runtime.box_float in
+  let get_str = get box_string in
+  let get_bool = get box_bool in
+  let get_int = get box_int in
+  let get_float = get box_float in
   let module E = Ezgw.Person in
   let parents =
     lazy (match E.parents p with
@@ -315,8 +325,8 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let burial = get (mk_burial conf) E.burial in
   let burial_place = get_str (E.burial_place conf base) in
   let children =
-    Jg_runtime.box_lazy @@
-    lazy (Jg_runtime.box_list @@
+    box_lazy @@
+    lazy (box_list @@
           List.map (get_n_mk_person conf base) (E.children base p))
   in
   let consanguinity = get_float (E.consanguinity) in
@@ -329,7 +339,8 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let death_place = get_str (E.death_place conf base) in
   let died = get_str (E.died conf) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
-  (* let events = Tlazy (lazy (Tlist (E.events conf base p |> List.map (mk_event conf base)))) in *)
+  print_endline __LOC__ ;
+  let events = Tlazy (lazy (Tlist (E.events conf base p |> List.map (mk_event conf base)))) in
   let families =
     let fam = Gwdb.get_family p in
     Tlazy (lazy (Tarray (Array.map (fun ifam ->
@@ -339,8 +350,8 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let father = mk_parent Gwdb.get_father in
   let first_name = get_str (E.first_name base) in
   let first_name_aliases =
-    Jg_runtime.box_list @@
-    List.map Jg_runtime.box_string (E.first_name_aliases base p)
+    box_list @@
+    List.map box_string (E.first_name_aliases base p)
   in
   let first_name_key = get_str (E.first_name_key base) in
   let first_name_key_val = get_str (E.first_name_key_val base) in
@@ -364,15 +375,15 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let is_male = get_bool E.is_male in
   let is_restricted = get_bool E.is_restricted in
   let linked_page =
-    Jg_runtime.box_lazy @@
+    box_lazy @@
     lazy (let fn = E.linked_page conf base p in Tpat (fun s -> Tstr (fn s) ) )
   in
   let max_ancestor_level = Tlazy (lazy (get_int (E.max_ancestor_level conf base) ) ) in
   let mother = mk_parent Gwdb.get_mother in
   let nb_families = get_int (E.nb_families conf) in
   let nobility_titles =
-    Jg_runtime.box_lazy @@
-    lazy (Jg_runtime.box_list @@
+    box_lazy @@
+    lazy (box_list @@
           List.map (mk_title conf base) @@ E.nobility_titles conf base p)
   in
   let occ = get_int E.occ in
@@ -385,17 +396,17 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let public_name = get_str (E.public_name base) in
   let qualifier = get_str (E.qualifier base) in
   let qualifiers =
-    Tlist (List.map Jg_runtime.box_string @@ E.qualifiers base p)
+    Tlist (List.map box_string @@ E.qualifiers base p)
   in
   let related =
-    Jg_runtime.box_lazy @@
-    lazy (Jg_runtime.box_list @@
+    box_lazy @@
+    lazy (box_list @@
           List.map (fun (a, b) -> mk_relation conf base (b, Some a)) @@ (* FIXME? *)
           E.related conf base p)
   in
   let relations =
-    Jg_runtime.box_lazy @@
-    lazy (Jg_runtime.box_list @@
+    box_lazy @@
+    lazy (box_list @@
           List.map (fun x -> mk_relation conf base (x, None)) @@ (* FIXME *)
           E.relations p)
   in
@@ -405,27 +416,27 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let source_burial = get_str @@ E.source_burial base in
   let source_death = get_str @@ E.source_death base in
   let source_fsource =
-    Jg_runtime.box_array @@
-    Array.map Jg_runtime.box_string @@
+    box_array @@
+    Array.map box_string @@
     E.source_fsource conf base p
   in
   let source_marriage =
-    Jg_runtime.box_array @@
-    Array.map Jg_runtime.box_string @@
+    box_array @@
+    Array.map box_string @@
     E.source_marriage conf base p
   in
   let source_psources = get_str @@ E.source_psources base in
   let static_max_ancestor_level =
-    Jg_runtime.box_lazy @@
+    box_lazy @@
     lazy (get_int ( (E.static_max_ancestor_level conf base) ) )
   in
   let str__ =
-    Jg_runtime.box_lazy @@
+    box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
   in
   let surame_key_val = get_str (E.surname_key_val base) in
   let surname = get_str (E.surname base) in
-  let surname_aliases = Tlist (List.map Jg_runtime.box_string (E.surname_aliases base p) ) in
+  let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
   let title = get_str (E.title conf base) in
   Tlazy (lazy (Tpat
@@ -447,6 +458,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "death_place" -> death_place
                    | "died" -> died
                    | "digest" -> digest
+                   | "events" -> events
                    | "families" -> families
                    | "father" -> father
                    | "first_name" -> first_name
@@ -642,8 +654,8 @@ and mk_warning conf base =
          ; Tset [ get_fam ifam
                 ; Tarray (Array.map (get_n_mk_person conf base) before)
                 ; Tarray (Array.map (get_n_mk_person conf base) after)
-                ; Tarray (Array.map Jg_runtime.box_bool bef_d)
-                ; Tarray (Array.map Jg_runtime.box_bool aft_d)
+                ; Tarray (Array.map box_bool bef_d)
+                ; Tarray (Array.map box_bool aft_d)
                 ] ]
   | ChangedOrderOfMarriages (p, before, after) ->
     let (bef_d, aft_d) = Difference.f before after in
@@ -651,8 +663,8 @@ and mk_warning conf base =
          ; Tset [ unsafe_mk_person conf base p
                 ; Tarray (Array.map get_fam before)
                 ; Tarray (Array.map get_fam after)
-                ; Tarray (Array.map Jg_runtime.box_bool bef_d)
-                ; Tarray (Array.map Jg_runtime.box_bool aft_d)
+                ; Tarray (Array.map box_bool bef_d)
+                ; Tarray (Array.map box_bool aft_d)
                 ] ]
   | ChangedOrderOfFamilyEvents (_ifam, before, after) ->
     let before = array_of_list_map (mk_fevent conf base) before in
@@ -661,8 +673,8 @@ and mk_warning conf base =
     Tset [ Tstr "ChangedOrderOfFamilyEvents"
          ; Tset [ Tarray before
                 ; Tarray after
-                ; Tarray (Array.map Jg_runtime.box_bool bef_d)
-                ; Tarray (Array.map Jg_runtime.box_bool aft_d)
+                ; Tarray (Array.map box_bool bef_d)
+                ; Tarray (Array.map box_bool aft_d)
                 ] ]
   | ChangedOrderOfPersonEvents (_p, before, after) ->
     let before = array_of_list_map (mk_pevent conf base) before in
@@ -671,8 +683,8 @@ and mk_warning conf base =
     Tset [ Tstr "ChangedOrderOfPersonEvents"
          ; Tset [ Tarray before
                 ; Tarray after
-                ; Tarray (Array.map Jg_runtime.box_bool bef_d)
-                ; Tarray (Array.map Jg_runtime.box_bool aft_d)
+                ; Tarray (Array.map box_bool bef_d)
+                ; Tarray (Array.map box_bool aft_d)
                 ] ]
   | ChildrenNotInOrder (ifam, _descend, elder, x) ->
     Tset [ Tstr "ChildrenNotInOrder"
@@ -958,20 +970,20 @@ let mk_i18n conf =
   let s = String.sub arg 1 (len - 1 - (len - ri)) in
   Tstr (Templ.eval_transl conf false s c)
 
-let string_of_death conf =
-  Tfun (fun ?kwargs:_ args -> match args with
-
-      | [ Tstr "DeadYoung" ; Tint sex ] -> Tstr (Util.transl_nth conf "died young" sex)
-      | [ Tstr "DeadDontKnowWhen" ; Tint sex ]-> Tstr (Util.transl_nth conf "died" sex)
-      | [ Tpat fn ; Tint sex ] -> begin match fn "death_reason" with
-          | Tstr "Killed" -> Tstr (Util.transl_nth conf "killed (in action)" sex)
-          | Tstr "Murdered" -> Tstr (Util.transl_nth conf "murdered" sex)
-          | Tstr "Executed" -> Tstr (Util.transl_nth conf "executed (legally killed)" sex)
-          | Tstr "Disappeared" -> Tstr (Util.transl_nth conf "disappeared" sex)
-          | Tstr "Unspecified" -> Tstr (Util.transl_nth conf "died" sex)
-          | _ -> Tstr ""
-        end
-      | _ -> Tstr "")
+(* let string_of_death conf =
+ *   Tfun (fun ?kwargs:_ args -> match args with
+ * 
+ *       | [ Tstr "DeadYoung" ; Tint sex ] -> Tstr (Util.transl_nth conf "died young" sex)
+ *       | [ Tstr "DeadDontKnowWhen" ; Tint sex ]-> Tstr (Util.transl_nth conf "died" sex)
+ *       | [ Tpat fn ; Tint sex ] -> begin match fn "death_reason" with
+ *           | Tstr "Killed" -> Tstr (Util.transl_nth conf "killed (in action)" sex)
+ *           | Tstr "Murdered" -> Tstr (Util.transl_nth conf "murdered" sex)
+ *           | Tstr "Executed" -> Tstr (Util.transl_nth conf "executed (legally killed)" sex)
+ *           | Tstr "Disappeared" -> Tstr (Util.transl_nth conf "disappeared" sex)
+ *           | Tstr "Unspecified" -> Tstr (Util.transl_nth conf "died" sex)
+ *           | _ -> Tstr ""
+ *         end
+ *       | _ -> Tstr "") *)
 
 (* TODO: remove base *)
 let translate conf (* base *) =
@@ -1049,8 +1061,8 @@ let mk_base base =
 
 (* FIXME: move it into jingoo *)
 let forall = Tfun (fun ?kwargs:_ -> function
-    | [ Tlist l ; Tfun fn ] -> Tbool (List.for_all (fun x -> Jg_runtime.unbox_bool @@ fn [x]) l)
-    | [ Tarray l ; Tfun fn ] -> Tbool (Array.for_all (fun x -> Jg_runtime.unbox_bool @@ fn [x]) l)
+    | [ Tlist l ; Tfun fn ] -> Tbool (List.for_all (fun x -> unbox_bool @@ fn [x]) l)
+    | [ Tarray l ; Tfun fn ] -> Tbool (Array.for_all (fun x -> unbox_bool @@ fn [x]) l)
     | _ -> assert false
   )
 
@@ -1074,7 +1086,7 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
   :: ("Date", date_module conf)
-  :: ("string_of_death", string_of_death conf)
+  (* :: ("string_of_death", string_of_death conf) *)
   :: ("eq_dates", Tfun (fun ?kwargs:_ -> function
       |  [ Tpat d1 ; Tpat d2 ] ->
         Tbool (d1 "day" = d2 "day"

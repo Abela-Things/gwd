@@ -1,3 +1,4 @@
+open Jingoo
 open Jg_types
 
 let marshal verbose env file =

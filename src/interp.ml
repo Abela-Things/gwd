@@ -1,3 +1,4 @@
+open Jingoo
 
 let template_dir = ref ""
 
@@ -20,7 +21,7 @@ let interp_templ ~models ast =
               ; strict_mode = true
               }
     in
-    let output = Wserver.printf "%s" in
+    let output x = Wserver.printf "%s" @@ Jg_runtime.string_of_tvalue x in
     let ctx = Jg_interp.init_context ~env ~models ~output () in
     let ast = Jg_interp.import_macros env ctx ast in
     ignore @@ List.fold_left (Jg_interp.eval_statement env) ctx ast

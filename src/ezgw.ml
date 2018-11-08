@@ -80,6 +80,11 @@ let mk_note conf base p note =
   in
   Wiki.syntax_links conf wi (String.concat "\n" lines)
 
+let sex_of_index = function
+  | 0 -> Male
+  | 1 -> Female
+  | 2 -> Neuter
+  | _ -> raise (Invalid_argument "sex_of_index")
 
 module Person = struct
 
@@ -194,7 +199,11 @@ module Person = struct
   let digest base p =
     Update.digest_person (UpdateInd.string_person_of base p)
 
-  let events conf base p = Perso.events_list conf base p
+  let events conf base p =
+    print_endline __LOC__ ;
+    let l = Perso.events_list conf base p in
+    print_endline (string_of_int @@ List.length l) ;
+    l
 
   (* let fam_access p =
    *   (\* deprecated since 5.00: rather use "i=%family.index;;ip=%index;" *\)
@@ -1010,7 +1019,6 @@ module Person = struct
     List.map (sou base) (get_qualifiers p)
 
   let sex p =
-    (* Pour éviter les traductions bizarre, on ne teste pas p_auth. *)
     index_of_sex (get_sex p)
 
   let sosa conf base env r p =
@@ -1353,9 +1361,26 @@ module Event = struct
   let date (_, d, _, _, _, _, _) =
     Adef.od_of_cdate d
 
+  let place conf base (_, _, p, _, _, _, _) =
+    Util.string_of_place conf (sou base p)
+
   let spouse base (_, _, _, _, _, _, isp) =
     match isp with
     | Some isp -> poi base isp
     | None -> raise Not_found
+
+  let src base (_, _, _, _, s, _, _) =
+    sou base s
+
+  let name conf base (n, _, _, _, _, _, _) =
+    match n with
+    | Geneweb.Perso.Pevent name -> Util.string_of_pevent_name conf base name
+    | Fevent name -> Util.string_of_fevent_name conf base name
+
+  let note base (_, _, _, n, _, _, _) =
+    sou base n
+
+  let witnesses (_, _, _, _, _, w, _) =
+    w
 
 end
