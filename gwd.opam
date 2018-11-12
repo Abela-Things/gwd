@@ -4,11 +4,11 @@ maintainer: [ "Julien Sagot <julien.sagot@geneanet.org>" ]
 
 authors: [ "Julien Sagot" ]
 
-dev-repo: "git://github.com/geneanet/gnt-gwd"
+dev-repo: "git://github.com/geneanet/gwd"
 
-bug-reports: "https://github.com/geneanet/gnt-gwd/issues"
+bug-reports: "https://github.com/geneanet/gwd/issues"
 
-homepage: "https://github.com/geneanet/gnt-gwd"
+homepage: "https://github.com/geneanet/gwd"
 
 build: [ [ make ] ]
 

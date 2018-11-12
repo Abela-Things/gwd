@@ -1,6 +1,6 @@
 (executable
   (name gwd)
-  (public_name gnt-gwd)
+  (public_name gwd)
   (libraries geneweb geneweb.internal uucp jingoo)
   (modules ezgw data gwd handler interp)
 )
@@ -10,4 +10,12 @@
   (public_name gnt-jingoo-marshaler)
   (libraries uucp jingoo)
   (modules marshaler)
+)
+
+
+; Dummy library used to generate doc
+(library
+  (name types)
+  (modules types)
+  (modules_without_implementation types)
 )

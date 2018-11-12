@@ -23,8 +23,8 @@ script:
   - bash -ex .travis-ocaml.sh ;
     export OPAMYES=1 ;
     eval $(opam config env) ;
-    opam pin add gnt-gwd . --no-action ;
-    opam install gnt-gwd --deps-only ;
+    opam pin add gwd . --no-action ;
+    opam install gwd --deps-only ;
     make ;
 
 notifications:
