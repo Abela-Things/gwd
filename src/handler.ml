@@ -529,19 +529,11 @@ let handler =
         print_pop_pyr conf base
       end
 
-    ; fallback = begin fun mode _self conf base ->
+    ; fallback = begin fun mode -> restricted_wizard @@ fun _self conf base ->
         match mode with
-        | "TIMELINE" ->
-          begin match find_person_in_env conf base "" with
-            | Some p ->
-              let models =
-                ("ind", Data.get_n_mk_person conf base (Gwdb.get_key_index p) )
-                :: Data.default_env conf base
-              in
-              Interp.render ~file:"perso_module/timeline_1" ~models
-            | _ -> assert false
-          end
-        | _ -> assert false
+        | "SANDBOX" ->
+          Interp.render_jingoo ~file:"sandbox.jingoo" ~models:(Data.sandbox conf base)
+        | _ -> Wserver.printf "Error: unknown mode \"%s\"" mode
       end
 
   }

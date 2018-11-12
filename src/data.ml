@@ -292,7 +292,6 @@ and mk_title _conf _base (_nth, _name, _title, _places, _dates) =
    *     dates *)
 
 and unsafe_mk_person conf base (p : Gwdb.person) =
-  print_endline __LOC__ ;
   (* match Perso_link.get_father_link conf.command (get_key_index a) with
    * | Some fath ->
    *   let ep = Perso_link.make_ep_link base fath in
@@ -1097,3 +1096,33 @@ let default_env conf base (* p *) =
   :: ("base", mk_base base)
   :: ("forall", forall)
   :: mk_count ()
+
+let sandbox (conf : Config.config) base =
+  let get_person =
+    Tfun (fun ?kwargs:_ -> function
+        | [ Tint i ] -> get_n_mk_person conf base (Adef.iper_of_int i)
+        | _ -> failwith "type error: GET_PERSON"
+      )
+  in
+  let get_family =
+    Tfun (fun ?kwargs:_ -> function
+        | [ Tint i ] ->
+          let ifam = Adef.ifam_of_int i in
+          let cpl = Gwdb.foi base ifam in
+          get_n_mk_family conf base ifam cpl
+        | _ -> failwith "type error: GET_FAMILY"
+      )
+  in
+  let set_conf =
+    (* This one is based on a modified version of geneweb to make fields mutable. *)
+    Tfun (fun ?kwargs:_ -> function
+        | [ Tstr "wizard" ; value ] -> conf.wizard <- unbox_bool value ; Tnull
+        | Tstr key :: _ -> failwith (Printf.sprintf "Do not know conf.%s field" key)
+        | _ -> failwith (Printf.sprintf "Type error (%s)" __LOC__)
+      )
+  in
+  [ ("set_conf", set_conf)
+  ; ("GET_PERSON", get_person)
+  ; ("GET_FAMILY", get_family)
+  ]
+
