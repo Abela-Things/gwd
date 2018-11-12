@@ -176,51 +176,6 @@ and mk_date conf d =
       | _ -> raise Not_found
     )
 
-and date_module conf =
-  (* TODO ? Avoid date_module and include everything in date pat with lazy *)
-  let convert = function
-    | Tstr s -> Def.Dtext s
-    | Tpat x ->
-      let prec =
-        match unbox_string @@ x "prec" with
-        | "sure" -> Def.Sure
-        | "about" -> About
-        | "maybe" -> Maybe
-        | "before" -> Before
-        | "after" -> After
-        | _ -> assert false
-      in
-      let day = unbox_int @@ x "day" in
-      let month = unbox_int @@ x "month" in
-      let year = unbox_int @@ x "year" in
-      let delta = unbox_int @@ x "delta" in
-      let calendar = match unbox_string @@ x "calendar" with
-        | "Dgregorian" -> Def.Dgregorian
-        | "Djulian" -> Djulian
-        | "Dfrench" -> Dfrench
-        | "Dhebrew" -> Dhebrew
-        | _ -> assert false
-      in
-      Def.Dgreg ({day ; month ; year ; prec ; delta }, calendar)
-    | _ -> assert false
-  in
-
-  let string_of_ondate =
-    box_fun @@ fun ?kwargs:_ args ->
-    Tstr (Date.string_of_ondate conf @@ convert @@ List.hd args)
-  in
-  let string_of_date_sep =
-    box_fun @@ fun ?kwargs:_ -> function
-    | [ date ; Tstr sep ] -> Tstr (Date.string_of_date_sep conf sep @@ convert date)
-    | _ -> assert false
-  in
-  Tpat (function
-      | "string_of_ondate" -> string_of_ondate
-      | "string_of_date_sep" -> string_of_date_sep
-      | _ -> raise Not_found )
-
-(* conf.no_notes *)
-
 and get_n_mk_person conf base (i : Adef.iper) =
   (* TODO: ensure security *)
   (* get_access *)
@@ -807,7 +762,7 @@ let mk_conf conf base =
   let api_port = Tint conf.api_port in
   let manitou = Tbool conf.manitou in
   let supervisor = Tbool conf.supervisor in
-  let wizard = Tbool conf.wizard in
+  let wizard = Tvolatile (fun () -> Tbool conf.wizard) in
   let is_printed_by_template = Tbool conf.is_printed_by_template in
   let friend = Tbool conf.friend in
   let just_friend_wizard = Tbool conf.just_friend_wizard in
