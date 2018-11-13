@@ -1044,6 +1044,27 @@ let default_env conf base (* p *) =
   :: mk_count ()
 
 let sandbox (conf : Config.config) base =
+  let die =
+    let rec printer = function
+      | Tint x -> Printf.sprintf "Tint %d" x
+      | Tfloat x -> Printf.sprintf "Tfloat %f" x
+      | Tstr x -> Printf.sprintf "Tstr \"%s\"" (String.escaped x)
+      | Tbool x -> Printf.sprintf "Tbool %b" x
+      | Tobj _ -> Printf.sprintf "<Tobj>"
+      | Thash _ -> Printf.sprintf "<Thash>"
+      | Tlist x -> Printf.sprintf "Tlist [ %s ]" (String.concat ";" @@ List.map printer x)
+      | Tpat _ -> Printf.sprintf "<Tpat>"
+      | Tset _ -> Printf.sprintf "<Tset>"
+      | Tfun _ -> Printf.sprintf "<Tfun>"
+      | Tnull -> Printf.sprintf "Tnull"
+      | Tarray x -> Printf.sprintf "Tarray [| %s |]" (String.concat ";" @@ List.map printer @@ Array.to_list x)
+      | Tlazy _ -> Printf.sprintf "Tlazy"
+      | Tvolatile _ -> Printf.sprintf "Tvolatile"
+    in
+    Tfun (fun ?kwargs:_ -> function
+        | [ x ] -> failwith (printer x)
+        | _ -> failwith "DIE takes only one parameter")
+  in
   let get_person =
     Tfun (fun ?kwargs:_ -> function
         | [ Tint i ] -> get_n_mk_person conf base (Adef.iper_of_int i)
@@ -1068,7 +1089,8 @@ let sandbox (conf : Config.config) base =
       )
   in
   let () = Random.self_init () in
-  ("set_conf", set_conf)
+  ("SET_CONF", set_conf)
+  :: ("DIE", die)
   :: ("GET_PERSON", get_person)
   :: ("GET_FAMILY", get_family)
   :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
