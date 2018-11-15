@@ -102,7 +102,15 @@ and date_compare =
       | [ d1 ; d2 ] ->
         begin match unbox_int @@ compare "year" d1 d2 with
           | 0 -> begin match unbox_int @@ compare "month" d1 d2 with
-              | 0 -> compare "day" d1 d2
+              | 0 -> begin match unbox_int @@ compare "day" d1 d2 with
+                  | 0 -> begin match Jg_runtime.jg_obj_lookup d1 "prec", Jg_runtime.jg_obj_lookup d2 "prec" with
+                      | p1, p2 when p1 = p2 -> Tint 0
+                      | Tstr "before", _ -> Tint (-1)
+                      | Tstr "after", _ -> Tint 1
+                      | _ -> Tint 0
+                    end
+                  | c -> Tint c
+                end
               | c -> Tint c
             end
           | c -> Tint c
