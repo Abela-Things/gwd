@@ -264,6 +264,7 @@ and mk_event conf base d =
     Tlazy (lazy (try unsafe_mk_person conf base @@ E.spouse base d
                  with Not_found -> Tnull))
   in
+  let kind = Tstr (E.kind base d) in
   let witnesses =
     Tlazy (lazy (Tarray (Array.map (fun (i, k) ->
         let p = get_n_mk_person conf base i in
@@ -278,6 +279,7 @@ and mk_event conf base d =
   let src = Tstr (E.src base d) in
   let note = Tstr (E.note base d) in
   Tpat (function "date" -> date
+               | "kind" -> kind
                | "name" -> name
                | "note" -> note
                | "place" -> place

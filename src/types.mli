@@ -219,6 +219,7 @@ and __death =
 
 and event =
   { date : date
+  ; kind : str
   ; name : str
   ; note : str
   ; place : str
