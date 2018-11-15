@@ -1,7 +1,7 @@
 (executable
   (name gwd)
   (public_name gwd)
-  (libraries geneweb geneweb.internal uucp jingoo)
+  (libraries geneweb uucp jingoo)
   (modules ezgw data gwd handler interp)
 )
 

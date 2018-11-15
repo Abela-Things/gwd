@@ -4,6 +4,7 @@
    Do not use on_xxx_date: use dates and use template to display it.
  *)
 
+open Geneweb
 open Jingoo
 open Jg_types
 
@@ -1116,7 +1117,7 @@ let sandbox (conf : Config.config) base =
   let set_conf =
     (* This one is based on a modified version of geneweb to make fields mutable. *)
     Tfun (fun ?kwargs:_ -> function
-        | [ Tstr "wizard" ; value ] -> conf.wizard <- unbox_bool value ; Tnull
+        (* | [ Tstr "wizard" ; value ] -> conf.wizard <- unbox_bool value ; Tnull *)
         | Tstr key :: _ -> failwith (Printf.sprintf "Do not know conf.%s field" key)
         | _ -> failwith (Printf.sprintf "Type error (%s)" __LOC__)
       )
