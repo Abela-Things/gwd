@@ -169,9 +169,11 @@ and date =
   ; month : int
   ; prec : str
   ; string_of_age : str
+  ; string_of_date_sep : (str -> str) func
   ; string_of_ondate : str
   ; year : int
   ;__compare__ : (date -> date -> int) func
+  ;__eq__ : (date -> date -> bool) func
   }
 (**
    - [calendar] can be: ["Dgregorian"], ["Djulian"], ["Dfrench"] or ["Dhebrew"]

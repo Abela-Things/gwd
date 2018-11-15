@@ -13,6 +13,28 @@ let tfun1 name fn =
 
 let mk_opt fn = function None -> Tnull | Some x -> fn x
 
+let date_compare_aux =
+  let compare field d1 d2 =
+    Jg_runtime.jg_compare
+      (Jg_runtime.jg_obj_lookup d1 field)
+      (Jg_runtime.jg_obj_lookup d2 field)
+  in
+  fun d1 d2 ->
+    match unbox_int @@ compare "year" d1 d2 with
+    | 0 -> begin match unbox_int @@ compare "month" d1 d2 with
+        | 0 -> begin match unbox_int @@ compare "day" d1 d2 with
+            | 0 -> begin match Jg_runtime.jg_obj_lookup d1 "prec", Jg_runtime.jg_obj_lookup d2 "prec" with
+                | p1, p2 when p1 = p2 -> Tint 0
+                | Tstr "before", _ -> Tint (-1)
+                | Tstr "after", _ -> Tint 1
+                | _ -> Tint 0
+              end
+            | c -> Tint c
+          end
+        | c -> Tint c
+      end
+    | c -> Tint c
+
 let rec mk_family (conf : Config.config) base fcd =
   let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
@@ -93,29 +115,10 @@ and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   mk_family conf base (ifam, Gwdb.foi base ifam, cpl, m_auth)
 
 and date_compare =
-  let compare field d1 d2 =
-   Jg_runtime.jg_compare
-     (Jg_runtime.jg_obj_lookup d1 field)
-     (Jg_runtime.jg_obj_lookup d2 field)
-  in
-  Tfun (fun ?kwargs:_ args -> match args with
-      | [ d1 ; d2 ] ->
-        begin match unbox_int @@ compare "year" d1 d2 with
-          | 0 -> begin match unbox_int @@ compare "month" d1 d2 with
-              | 0 -> begin match unbox_int @@ compare "day" d1 d2 with
-                  | 0 -> begin match Jg_runtime.jg_obj_lookup d1 "prec", Jg_runtime.jg_obj_lookup d2 "prec" with
-                      | p1, p2 when p1 = p2 -> Tint 0
-                      | Tstr "before", _ -> Tint (-1)
-                      | Tstr "after", _ -> Tint 1
-                      | _ -> Tint 0
-                    end
-                  | c -> Tint c
-                end
-              | c -> Tint c
-            end
-          | c -> Tint c
-        end
-      | _ -> raise @@ Invalid_argument "GwdEnv.date_compare")
+  Jg_types.func_arg2 (fun ?kwargs:_ d1 d2 -> date_compare_aux d1 d2)
+
+and date_eq =
+  Jg_types.func_arg2 (fun ?kwargs:_ d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
 and mk_date conf d =
   let lazy_field fn =
@@ -127,6 +130,10 @@ and mk_date conf d =
   let month = lazy_field (fun d _ -> Tint d.Def.month) in
   let day = lazy_field (fun d _ -> Tint d.Def.day) in
   let string_of_age = lazy_field (fun d _ -> Tstr (Date.string_of_age conf d)) in
+  let string_of_date_sep =
+    Jg_types.func_arg1
+      (fun ?kwargs:_ sep -> Tstr (Date.string_of_date_sep conf (unbox_string sep) d) )
+  in
   let string_of_ondate = Tlazy (lazy (Tstr (Date.string_of_ondate conf d)) ) in
   let prec = lazy_field (fun d _ -> Tstr (match d.Def.prec with
       | Def.Sure -> "sure"
@@ -161,9 +168,11 @@ and mk_date conf d =
       | "month" -> month
       | "prec" -> prec
       | "string_of_age" -> string_of_age
+      | "string_of_date_sep" -> string_of_date_sep
       | "string_of_ondate" -> string_of_ondate
       | "year" -> year
       | "__compare__" -> date_compare
+      | "__eq__" -> date_eq
       | _ -> raise Not_found
     )
 
@@ -349,7 +358,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let death_place = get_str (E.death_place conf base) in
   let died = get_str (E.died conf) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
-  print_endline __LOC__ ;
   let events = Tlazy (lazy (Tlist (E.events conf base p |> List.map (mk_event conf base)))) in
   let families =
     let fam = Gwdb.get_family p in
@@ -980,21 +988,6 @@ let mk_i18n conf =
   let s = String.sub arg 1 (len - 1 - (len - ri)) in
   Tstr (Templ.eval_transl conf false s c)
 
-(* let string_of_death conf =
- *   Tfun (fun ?kwargs:_ args -> match args with
- * 
- *       | [ Tstr "DeadYoung" ; Tint sex ] -> Tstr (Util.transl_nth conf "died young" sex)
- *       | [ Tstr "DeadDontKnowWhen" ; Tint sex ]-> Tstr (Util.transl_nth conf "died" sex)
- *       | [ Tpat fn ; Tint sex ] -> begin match fn "death_reason" with
- *           | Tstr "Killed" -> Tstr (Util.transl_nth conf "killed (in action)" sex)
- *           | Tstr "Murdered" -> Tstr (Util.transl_nth conf "murdered" sex)
- *           | Tstr "Executed" -> Tstr (Util.transl_nth conf "executed (legally killed)" sex)
- *           | Tstr "Disappeared" -> Tstr (Util.transl_nth conf "disappeared" sex)
- *           | Tstr "Unspecified" -> Tstr (Util.transl_nth conf "died" sex)
- *           | _ -> Tstr ""
- *         end
- *       | _ -> Tstr "") *)
-
 (* TODO: remove base *)
 let translate conf (* base *) =
   let decline =
@@ -1045,10 +1038,6 @@ let decode_varenv =
 let code_varenv =
   tfun1 "code_varenv" @@ fun str -> Tstr (Wserver.encode str)
 
-(* let languageName conf =
- *   tfun1 "languageName" @@
- *   fun s -> Tstr (Translate.language_name s (Util.transl conf " !languages")) *)
-
 let mk_evar conf =
   Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
       | Some vv -> Tstr (Util.quote_escaped vv)
@@ -1095,15 +1084,6 @@ let default_env conf base (* p *) =
   :: ("decode_varenv", decode_varenv)
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
-  :: ("Date", date_module conf)
-  (* :: ("string_of_death", string_of_death conf) *)
-  :: ("eq_dates", Tfun (fun ?kwargs:_ -> function
-      |  [ Tpat d1 ; Tpat d2 ] ->
-        Tbool (d1 "day" = d2 "day"
-               && d1 "month" = d2 "month"
-               && d1 "year" = d2 "year")
-      | _ -> Tbool false)
-    )
   :: ("base", mk_base base)
   :: ("forall", forall)
   :: mk_count ()
@@ -1132,8 +1112,10 @@ let sandbox (conf : Config.config) base =
         | _ -> failwith (Printf.sprintf "Type error (%s)" __LOC__)
       )
   in
-  [ ("set_conf", set_conf)
-  ; ("GET_PERSON", get_person)
-  ; ("GET_FAMILY", get_family)
-  ]
-
+  let () = Random.self_init () in
+  ("set_conf", set_conf)
+  :: ("GET_PERSON", get_person)
+  :: ("GET_FAMILY", get_family)
+  :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
+  :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
+  :: default_env conf base
