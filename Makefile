@@ -37,3 +37,10 @@ clean:
 	dune clean
 
 .PHONY: clean
+
+launch:
+	_build/default/src/gwd.exe \
+	-p 2318 \
+	-bd /home/`whoami`/workspace/bases/ \
+	-hd /home/`whoami`/workspace/geneweb/hd \
+	-td /home/`whoami`/workspace/geneanet.git/geneweb/gw_plus/gw/etc

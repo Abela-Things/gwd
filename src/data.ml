@@ -115,10 +115,10 @@ and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   mk_family conf base (ifam, Gwdb.foi base ifam, cpl, m_auth)
 
 and date_compare =
-  Jg_types.func_arg2 (fun ?kwargs:_ d1 d2 -> date_compare_aux d1 d2)
+  func_arg2 (fun ?kwargs:_ d1 d2 -> date_compare_aux d1 d2)
 
 and date_eq =
-  Jg_types.func_arg2 (fun ?kwargs:_ d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
+  func_arg2 (fun ?kwargs:_ d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
 and mk_date conf d =
   let lazy_field fn =
@@ -1043,6 +1043,86 @@ let default_env conf base (* p *) =
   :: ("forall", forall)
   :: mk_count ()
 
+let to_pevent _base = function
+  | "Epers_Birth" -> Def.Epers_Birth
+  | "Epers_Baptism" -> Epers_Baptism
+  | "Epers_Death" -> Epers_Death
+  | "Epers_Burial" -> Epers_Burial
+  | "Epers_Cremation" -> Epers_Cremation
+  | "Epers_Accomplishment" -> Epers_Accomplishment
+  | "Epers_Acquisition" -> Epers_Acquisition
+  | "Epers_Adhesion" -> Epers_Adhesion
+  | "Epers_BaptismLDS" -> Epers_BaptismLDS
+  | "Epers_BarMitzvah" -> Epers_BarMitzvah
+  | "Epers_BatMitzvah" -> Epers_BatMitzvah
+  | "Epers_Benediction" -> Epers_Benediction
+  | "Epers_ChangeName" -> Epers_ChangeName
+  | "Epers_Circumcision" -> Epers_Circumcision
+  | "Epers_Confirmation" -> Epers_Confirmation
+  | "Epers_ConfirmationLDS" -> Epers_ConfirmationLDS
+  | "Epers_Decoration" -> Epers_Decoration
+  | "Epers_DemobilisationMilitaire" -> Epers_DemobilisationMilitaire
+  | "Epers_Diploma" -> Epers_Diploma
+  | "Epers_Distinction" -> Epers_Distinction
+  | "Epers_Dotation" -> Epers_Dotation
+  | "Epers_DotationLDS" -> Epers_DotationLDS
+  | "Epers_Education" -> Epers_Education
+  | "Epers_Election" -> Epers_Election
+  | "Epers_Emigration" -> Epers_Emigration
+  | "Epers_Excommunication" -> Epers_Excommunication
+  | "Epers_FamilyLinkLDS" -> Epers_FamilyLinkLDS
+  | "Epers_FirstCommunion" -> Epers_FirstCommunion
+  | "Epers_Funeral" -> Epers_Funeral
+  | "Epers_Graduate" -> Epers_Graduate
+  | "Epers_Hospitalisation" -> Epers_Hospitalisation
+  | "Epers_Illness" -> Epers_Illness
+  | "Epers_Immigration" -> Epers_Immigration
+  | "Epers_ListePassenger" -> Epers_ListePassenger
+  | "Epers_MilitaryDistinction" -> Epers_MilitaryDistinction
+  | "Epers_MilitaryPromotion" -> Epers_MilitaryPromotion
+  | "Epers_MilitaryService" -> Epers_MilitaryService
+  | "Epers_MobilisationMilitaire" -> Epers_MobilisationMilitaire
+  | "Epers_Naturalisation" -> Epers_Naturalisation
+  | "Epers_Occupation" -> Epers_Occupation
+  | "Epers_Ordination" -> Epers_Ordination
+  | "Epers_Property" -> Epers_Property
+  | "Epers_Recensement" -> Epers_Recensement
+  | "Epers_Residence" -> Epers_Residence
+  | "Epers_Retired" -> Epers_Retired
+  | "Epers_ScellentChildLDS" -> Epers_ScellentChildLDS
+  | "Epers_ScellentParentLDS" -> Epers_ScellentParentLDS
+  | "Epers_ScellentSpouseLDS" -> Epers_ScellentSpouseLDS
+  | "Epers_VenteBien" -> Epers_VenteBien
+  | "Epers_Will" -> Epers_Will
+  | s -> failwith s
+
+let to_fevent _base = function
+  | "Efam_Marriage" -> Def.Efam_Marriage
+  | "Efam_NoMarriage" -> Efam_NoMarriage
+  | "Efam_NoMention" -> Efam_NoMention
+  | "Efam_Engage" -> Efam_Engage
+  | "Efam_Divorce" -> Efam_Divorce
+  | "Efam_Separated" -> Efam_Separated
+  | "Efam_Annulation" -> Efam_Annulation
+  | "Efam_MarriageBann" -> Efam_MarriageBann
+  | "Efam_MarriageContract" -> Efam_MarriageContract
+  | "Efam_MarriageLicense" -> Efam_MarriageLicense
+  | "Efam_PACS" -> Efam_PACS
+  | "Efam_Residence" -> Efam_Residence
+  | s -> failwith s
+
+let module_event conf base = box_pat @@ function
+  | "string_of_event" ->
+    func_arg1 begin fun ?kwargs:_ -> function
+      | Tstr s when String.length s > 6 && String.sub s 0 6 = "Epers_" ->
+        Tstr (Util.string_of_pevent_name conf base (to_pevent base s))
+      | Tstr s when String.length s > 6 && String.sub s 0 5 = "Efam_" ->
+        Tstr (Util.string_of_fevent_name conf base (to_fevent base s))
+      | Tstr x -> failwith x
+      | x -> Jg_runtime.failwith_type_error_1 "string_of_pevent" x
+    end
+  | _ -> raise Not_found
+
 let sandbox (conf : Config.config) base =
   let die =
     let rec printer = function
@@ -1095,4 +1175,5 @@ let sandbox (conf : Config.config) base =
   :: ("GET_FAMILY", get_family)
   :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
+  :: ("EVENT", module_event conf base)
   :: default_env conf base
