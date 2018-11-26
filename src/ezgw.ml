@@ -118,6 +118,8 @@ module Person = struct
 
   let bname_prefix conf = Util.commd conf
 
+  let birth_date p = Adef.od_of_cdate (get_birth p)
+
   let birth_place conf base p =
     Util.string_of_place conf (sou base (get_birth_place p))
 
@@ -200,10 +202,7 @@ module Person = struct
     Update.digest_person (UpdateInd.string_person_of base p)
 
   let events conf base p =
-    print_endline __LOC__ ;
-    let l = Perso.events_list conf base p in
-    print_endline (string_of_int @@ List.length l) ;
-    l
+    Perso.events_list conf base p
 
   (* let fam_access p =
    *   (\* deprecated since 5.00: rather use "i=%family.index;;ip=%index;" *\)
@@ -892,6 +891,16 @@ module Person = struct
             | _ -> acc)
           list (get_rparents c) )
       [] (List.sort_uniq compare (get_related p))
+
+  let siblings base p =
+    match get_parents p with
+    | Some ifam ->
+      let ip = get_key_index p in
+      Array.fold_right
+        (fun i acc -> if i <> ip then i :: acc else acc)
+        (get_children (foi base ifam))
+        []
+    | None -> []
 
   let slash_baptism_date conf p =
     match Adef.od_of_cdate (get_baptism p) with

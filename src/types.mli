@@ -240,8 +240,8 @@ and relation =
   { has_relation_her : bool
   ; has_relation_him : bool
   ; related : person
-  ; related_type : bool
-  ; relation_type : bool
+  ; related_type : string
+  ; relation_type : string
   ; relation_her : bool
   ; relation_him : bool
   }
@@ -312,3 +312,21 @@ and conf =
 and lexicon
 
 and time
+
+(** {2 The sandbox } *)
+
+(** Sandbox is accessible to wizard using [m=SANBDOX] get parameter.
+
+    This page define some extra functions in the environement:
+*)
+
+val _GET_PERSON : int -> person
+val _GET_FAMILY : int -> family
+val _RANDOM_IPER : unit -> int
+val _RANDOM_IPER : unit -> int
+
+module EVENT : sig
+  val string_of_event : event -> string
+end
+
+val trans : string -> string

@@ -8,9 +8,6 @@ open Geneweb
 open Jingoo
 open Jg_types
 
-let tfun1 name fn =
-  Tfun (fun ?kwargs:_ -> function [ Tstr a ]-> fn a | _ -> failwith name)
-
 let mk_opt fn = function None -> Tnull | Some x -> fn x
 
 let date_compare_aux =
@@ -114,11 +111,9 @@ and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   in
   mk_family conf base (ifam, Gwdb.foi base ifam, cpl, m_auth)
 
-and date_compare =
-  func_arg2 (fun ?kwargs:_ d1 d2 -> date_compare_aux d1 d2)
+and date_compare = func_arg2 date_compare_aux
 
-and date_eq =
-  func_arg2 (fun ?kwargs:_ d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
+and date_eq = func_arg2 (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
 and mk_date conf d =
   let lazy_field fn =
@@ -131,8 +126,9 @@ and mk_date conf d =
   let day = lazy_field (fun d _ -> Tint d.Def.day) in
   let string_of_age = lazy_field (fun d _ -> Tstr (Date.string_of_age conf d)) in
   let string_of_date_sep =
-    Jg_types.func_arg1
-      (fun ?kwargs:_ sep -> Tstr (Date.string_of_date_sep conf (unbox_string sep) d) )
+    func_arg1
+      (function Tstr sep -> Tstr (Date.string_of_date_sep conf sep d)
+              | x -> failwith_type_error_1 "string_of_date_sep" x)
   in
   let string_of_ondate = Tlazy (lazy (Tstr (Date.string_of_ondate conf d)) ) in
   let prec = lazy_field (fun d _ -> Tstr (match d.Def.prec with
@@ -173,6 +169,17 @@ and mk_date conf d =
       | "year" -> year
       | "__compare__" -> date_compare
       | "__eq__" -> date_eq
+      | _ -> raise Not_found
+    )
+
+and module_date conf =
+  let to_dmy d =
+    let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
+    { Def.day = int "day" ; month = int "month" ; year = int "year" ; prec = Def.Sure ; delta = 0 }
+  in
+  Tpat (function
+      | "string_of_age" -> func_arg1 (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
+      | "sub" -> func_arg2 (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
     )
 
@@ -295,6 +302,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let access = get_str (E.access conf base) in
   let age = get mk_dmy (E.age conf) in
   let baptism_place = get_str (E.baptism_place conf base) in
+  let birth_date = mk_opt (mk_date conf) (E.birth_date p) in
   let birth_place = get_str (E.birth_place conf base) in
   let burial = get (mk_burial conf) E.burial in
   let burial_place = get_str (E.burial_place conf base) in
@@ -314,11 +322,16 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let died = get_str (E.died conf) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
   let events = Tlazy (lazy (Tlist (E.events conf base p |> List.map (mk_event conf base)))) in
+  let lazy_families = lazy (Array.map (fun ifam -> ifam, Gwdb.foi base ifam) @@ Gwdb.get_family p) in
   let families =
-    let fam = Gwdb.get_family p in
-    Tlazy (lazy (Tarray (Array.map (fun ifam ->
-        let cpl = Gwdb.foi base ifam in
-        get_n_mk_family conf base ~origin:iper' ifam cpl) fam) ) )
+    Tlazy (lazy (Tarray (Array.map (fun (ifam, cpl) -> get_n_mk_family conf base ~origin:iper' ifam cpl) @@
+                         Lazy.force lazy_families) ) )
+  in
+  let spouses =
+    Tlazy (lazy (Tarray (Array.map (fun (_, c) ->
+        let f = Gwdb.get_father c in
+        get_n_mk_person conf base (if f = iper' then Gwdb.get_mother c else f) )
+        (Lazy.force lazy_families) ) ) )
   in
   let father = mk_parent Gwdb.get_father in
   let first_name = get_str (E.first_name base) in
@@ -384,6 +397,8 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
           E.relations p)
   in
   let sex = get_int E.sex in
+  let siblings =
+    Tlazy (lazy (Tlist (E.siblings base p |> List.map (fun i -> Tlazy (lazy (get_n_mk_person conf base i))))) ) in
   let source_baptism = get_str @@ E.source_baptism base in
   let source_birth = get_str @@ E.source_birth base in
   let source_burial = get_str @@ E.source_burial base in
@@ -407,7 +422,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
   in
-  let surame_key_val = get_str (E.surname_key_val base) in
+  let surname_key_val = get_str (E.surname_key_val base) in
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
@@ -417,6 +432,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "access" -> access
                    | "age" -> age
                    | "baptism_place" -> baptism_place
+                   | "birth_date" -> birth_date
                    | "birth_place" -> birth_place
                    | "burial" -> burial
                    | "burial_place" -> burial_place
@@ -474,6 +490,8 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "qualifiers" -> qualifiers
                    | "relations" -> relations
                    | "related" -> related
+                   | "sex" -> sex
+                   | "siblings" -> siblings
                    | "source_baptism" -> source_baptism
                    | "source_birth" -> source_birth
                    | "source_burial" -> source_burial
@@ -481,13 +499,13 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "source_fsource" -> source_fsource
                    | "source_marriage" -> source_marriage
                    | "source_psources" -> source_psources
+                   | "spouses" -> spouses
                    | "static_max_ancestor_level" -> static_max_ancestor_level
                    | "surname" -> surname
                    | "surname_aliases" -> surname_aliases
                    | "surname_key" -> surname_key
-                   | "surame_key_val" -> surame_key_val
+                   | "surname_key_val" -> surname_key_val
                    | "title" -> title
-                   | "sex" -> sex
                    | "__str__" -> str__
                    | _ -> raise Not_found
                  )
@@ -935,49 +953,45 @@ let mk_env conf =
       | _ -> raise Not_found
     )
 
+
 let mk_i18n conf =
-  tfun1 "i18n" @@ fun arg ->
-  let len = String.length arg in
-  let ri = String.rindex arg ']' in
-  let c = if ri = len - 1 then "" else String.sub arg (ri + 1) (len - ri - 1) in
-  let s = String.sub arg 1 (len - 1 - (len - ri)) in
-  Tstr (Templ.eval_transl conf false s c)
+  func_arg1 @@ function
+  | Tstr arg ->
+     let len = String.length arg in
+     let ri = String.rindex arg ']' in
+     let c = if ri = len - 1 then "" else String.sub arg (ri + 1) (len - ri - 1) in
+     let s = String.sub arg 1 (len - 1 - (len - ri)) in
+     Tstr (Templ.eval_transl conf false s c)
+  | x -> failwith_type_error_1 "i18n" x
 
 (* TODO: remove base *)
 let translate conf (* base *) =
-  let decline =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr s1 ; Tstr s2 ] -> Tstr (Util.transl_decline conf s1 s2)
-        | _ -> assert false
-      )
+  let decline = func_arg2 @@ fun s1 s2 ->
+    try Tstr (Util.transl_decline conf (unbox_string s1) (unbox_string s2))
+    with _ -> failwith_type_error_2 "translate" s1 s2
   in
-  let nth =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr s ; Tint i ] -> Tstr (Util.transl_nth conf s i)
-        | [ Tstr s ; Tstr i ] -> Tstr (Util.transl_nth conf s @@ int_of_string i)
-        | _ -> assert false)
+  let nth = func_arg2 @@ fun a1 a2 ->  match a1, a2 with
+    | Tstr s, Tint i -> Tstr (Util.transl_nth conf s i)
+    | Tstr s, Tstr i -> Tstr (Util.transl_nth conf s @@ int_of_string i)
+    | _ -> failwith_type_error_2 "nth" a1 a2
   in
-  let transl_a_of_b =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr x ; Tstr y ] -> Tstr (Util.transl_a_of_b conf x y)
-        | _ -> assert false)
+  let transl_a_of_b = func_arg2 @@ fun x y ->
+    try Tstr (Util.transl_a_of_b conf (unbox_string x) (unbox_string y))
+    with _ -> failwith_type_error_2 "a_of_b" x y
   in
-  let transl_a_of_gr_eq_gen_lev =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr x ; Tstr y ] -> Tstr (Util.transl_a_of_gr_eq_gen_lev conf x y)
-        | _ -> assert false)
+  let transl_a_of_gr_eq_gen_lev = func_arg2 @@ fun x y ->
+    try Tstr (Util.transl_a_of_gr_eq_gen_lev conf (unbox_string x) (unbox_string y))
+    with _ -> failwith_type_error_2 "a_of_gr_eq_gen_lev" x y
   in
-  let transl =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr x ] -> Tstr (Util.transl conf x)
-        | _ -> assert false)
+  let transl = func_arg1 @@ fun x ->
+    try Tstr (Util.transl conf (unbox_string x))
+    with _ -> failwith_type_error_1 "transl" x
   in
-  let ftransl =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tstr s ; Tint i ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
-        | [ Tstr s ; Tstr s' ] -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
-        | Tstr s :: _ -> failwith s
-        | _ -> assert false)
+  let ftransl = func_arg2 @@ fun x y ->
+    match x, y with
+    | Tstr s, Tint i -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
+    | Tstr s, Tstr s' -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
+    | _ -> failwith_type_error_2 "ftransl" x y
   in
   Tpat (function "decline" -> decline
                | "nth" -> nth
@@ -988,10 +1002,14 @@ let translate conf (* base *) =
                | x -> failwith x)
 
 let decode_varenv =
-  tfun1 "decode_varenv" @@ fun str -> Tstr (Wserver.decode str)
+  func_arg1 @@ fun str ->
+  try Tstr (Wserver.decode @@ unbox_string str)
+  with _ -> failwith_type_error_1 "decode_varenv" str
 
 let code_varenv =
-  tfun1 "code_varenv" @@ fun str -> Tstr (Wserver.encode str)
+  func_arg1 @@ fun str ->
+  try Tstr (Wserver.encode @@ unbox_string str)
+  with _ -> failwith_type_error_1 "decode_varenv" str
 
 let mk_evar conf =
   Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
@@ -1013,13 +1031,6 @@ let mk_base base =
       | _ -> raise Not_found
     )
 
-(* FIXME: move it into jingoo *)
-let forall = Tfun (fun ?kwargs:_ -> function
-    | [ Tlist l ; Tfun fn ] -> Tbool (List.for_all (fun x -> unbox_bool @@ fn [x]) l)
-    | [ Tarray l ; Tfun fn ] -> Tbool (Array.for_all (fun x -> unbox_bool @@ fn [x]) l)
-    | _ -> assert false
-  )
-
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1040,7 +1051,6 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
   :: ("base", mk_base base)
-  :: ("forall", forall)
   :: mk_count ()
 
 let to_pevent _base = function
@@ -1111,24 +1121,24 @@ let to_fevent _base = function
   | "Efam_Residence" -> Efam_Residence
   | s -> failwith s
 
-let module_event conf base = box_pat @@ function
-  | "string_of_event" ->
-    func_arg1 begin fun ?kwargs:_ -> function
-      | Tstr s when String.length s > 6 && String.sub s 0 6 = "Epers_" ->
-        Tstr (Util.string_of_pevent_name conf base (to_pevent base s))
-      | Tstr s when String.length s > 6 && String.sub s 0 5 = "Efam_" ->
-        Tstr (Util.string_of_fevent_name conf base (to_fevent base s))
-      | Tstr x -> failwith x
-      | x -> Jg_runtime.failwith_type_error_1 "string_of_pevent" x
-    end
-  | _ -> raise Not_found
+(**
+   [{{ 'foo' | trans }}], [{{ "foo" | trans }}], [{{ trans ("foo") }}]
+   all get converted to [{{ 'foo' | trans }}].
+
+   If the argument (['foo']) contains a ['], double quotes are used.
+  *)
+let trans =
+  func_arg1 @@ function
+  | Tstr s -> Tstr (Printf.sprintf
+                      (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
+  | x -> failwith_type_error_1 "trans" x
 
 let sandbox (conf : Config.config) base =
   let die =
     let rec printer = function
       | Tint x -> Printf.sprintf "Tint %d" x
       | Tfloat x -> Printf.sprintf "Tfloat %f" x
-      | Tstr x -> Printf.sprintf "Tstr \"%s\"" (String.escaped x)
+      | Tstr x -> Printf.sprintf "Tstr %s" (String.escaped x)
       | Tbool x -> Printf.sprintf "Tbool %b" x
       | Tobj _ -> Printf.sprintf "<Tobj>"
       | Thash _ -> Printf.sprintf "<Thash>"
@@ -1141,39 +1151,25 @@ let sandbox (conf : Config.config) base =
       | Tlazy _ -> Printf.sprintf "Tlazy"
       | Tvolatile _ -> Printf.sprintf "Tvolatile"
     in
-    Tfun (fun ?kwargs:_ -> function
-        | [ x ] -> failwith (printer x)
-        | _ -> failwith "DIE takes only one parameter")
+    func_arg1 @@ fun x -> Tstr (printer x)
   in
-  let get_person =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tint i ] -> get_n_mk_person conf base (Adef.iper_of_int i)
-        | _ -> failwith "type error: GET_PERSON"
-      )
+  let get_person = func_arg1 @@ function
+    | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
+    | x -> failwith_type_error_1 "GET_PERSON" x
   in
-  let get_family =
-    Tfun (fun ?kwargs:_ -> function
-        | [ Tint i ] ->
-          let ifam = Adef.ifam_of_int i in
-          let cpl = Gwdb.foi base ifam in
-          get_n_mk_family conf base ifam cpl
-        | _ -> failwith "type error: GET_FAMILY"
-      )
-  in
-  let set_conf =
-    (* This one is based on a modified version of geneweb to make fields mutable. *)
-    Tfun (fun ?kwargs:_ -> function
-        (* | [ Tstr "wizard" ; value ] -> conf.wizard <- unbox_bool value ; Tnull *)
-        | Tstr key :: _ -> failwith (Printf.sprintf "Do not know conf.%s field" key)
-        | _ -> failwith (Printf.sprintf "Type error (%s)" __LOC__)
-      )
+  let get_family = func_arg1 @@ function
+    | Tint i ->
+      let ifam = Adef.ifam_of_int i in
+      let cpl = Gwdb.foi base ifam in
+      get_n_mk_family conf base ifam cpl
+    | x -> failwith_type_error_1 "GET_FAMILY" x
   in
   let () = Random.self_init () in
-  ("SET_CONF", set_conf)
-  :: ("DIE", die)
+  ("DIE", die)
   :: ("GET_PERSON", get_person)
   :: ("GET_FAMILY", get_family)
   :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
-  :: ("EVENT", module_event conf base)
+  :: ("DATE", module_date conf)
+  :: ("trans", trans)
   :: default_env conf base
