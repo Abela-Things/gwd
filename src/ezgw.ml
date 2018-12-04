@@ -902,6 +902,23 @@ module Person = struct
         []
     | None -> []
 
+  let half_siblings base p =
+    match get_parents p with
+    | Some ifam ->
+      let ip = get_key_index p in
+      let f = foi base ifam in
+      let fath = poi base @@ get_father f in
+      let moth = poi base @@ get_mother f in
+      let filter = fun (acc : iper list) i ->
+        if i = ifam then acc else
+          Array.fold_right
+            (fun i acc -> if i <> ip then i :: acc else acc)
+            (get_children (foi base i)) acc
+      in
+      Array.fold_left
+        filter (Array.fold_left filter [] (get_family fath)) (get_family moth)
+    | None -> []
+
   let slash_baptism_date conf p =
     match Adef.od_of_cdate (get_baptism p) with
     | Some d -> Date.string_slash_of_date conf d

@@ -397,8 +397,11 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
           E.relations p)
   in
   let sex = get_int E.sex in
-  let siblings =
-    Tlazy (lazy (Tlist (E.siblings base p |> List.map (fun i -> Tlazy (lazy (get_n_mk_person conf base i))))) ) in
+  let siblings_aux fn =
+    Tlazy (lazy (Tlist (fn base p |> List.map (fun i -> Tlazy (lazy (get_n_mk_person conf base i))))))
+  in
+  let siblings = siblings_aux E.siblings in
+  let half_siblings = siblings_aux E.half_siblings in
   let source_baptism = get_str @@ E.source_baptism base in
   let source_birth = get_str @@ E.source_birth base in
   let source_burial = get_str @@ E.source_burial base in
@@ -454,6 +457,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "first_name_aliases" -> first_name_aliases
                    | "first_name_key" -> first_name_key
                    | "first_name_key_val" -> first_name_key_val
+                   | "half_siblings" -> half_siblings
                    | "has_children" -> has_children
                    | "has_event" -> has_event
                    | "has_image" -> has_image
