@@ -12,7 +12,7 @@ let mk_env () =
 
 let open_templ file =
   let file = Filename.concat !template_dir file in
-  let ch = open_in_bin @@ file ^ ".jinja2.marshaled" in
+  let ch = open_in_bin @@ file in
   try
     let ast : Jg_types.statement list = Marshal.from_channel ch in
     close_in ch ;

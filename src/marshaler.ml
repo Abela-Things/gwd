@@ -42,7 +42,7 @@ let compile_dir dir =
             ; extensions = []
             ; strict_mode = false }
   in
-  let files = ls dir (fun f -> Filename.extension f = ".jinja2") in
+  let files = ls dir (fun f -> Filename.extension f = ".jingoo") in
   List.iter (marshal true env) files
 
 let () =
