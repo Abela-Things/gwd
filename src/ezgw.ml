@@ -1326,9 +1326,7 @@ module Family = struct
          Wiki.wi_person_exists = person_exists conf base;
          Wiki.wi_always_show_link = conf.wizard || conf.friend}
       in
-      let s = Wiki.syntax_links conf wi (String.concat "\n" lines) in
-      let s = Util.replace_quotes s in
-      if conf.pure_xhtml then Util.check_xhtml s else s
+      Wiki.syntax_links conf wi (String.concat "\n" lines)
     else ""
 
   let marriage_source conf base (_, fam, _, m_auth) =
@@ -1343,9 +1341,7 @@ module Family = struct
          Wiki.wi_person_exists = person_exists conf base;
          Wiki.wi_always_show_link = conf.wizard || conf.friend}
       in
-      let s = Wiki.syntax_links conf wi (String.concat "\n" lines) in
-      let s = Util.replace_quotes s in
-      if conf.pure_xhtml then Util.check_xhtml s else s
+      Wiki.syntax_links conf wi (String.concat "\n" lines)
     else ""
 
   let mother (_, _, (_, imoth, _), _) =
