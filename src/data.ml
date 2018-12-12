@@ -1047,7 +1047,6 @@ let trans =
                       (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
   | x -> failwith_type_error_1 "trans" x
 
-
 let jg_printf_aux_opt_flag s i =
   let rec loop i = match String.get s i with
     | '-' | '0' | '+' | ' ' -> loop (i + 1)
@@ -1149,86 +1148,6 @@ let default_env conf base (* p *) =
   :: ("base", mk_base base)
   :: ("printf", jg_printf)
   :: mk_count ()
-
-let to_pevent _base = function
-  | "Epers_Birth" -> Def.Epers_Birth
-  | "Epers_Baptism" -> Epers_Baptism
-  | "Epers_Death" -> Epers_Death
-  | "Epers_Burial" -> Epers_Burial
-  | "Epers_Cremation" -> Epers_Cremation
-  | "Epers_Accomplishment" -> Epers_Accomplishment
-  | "Epers_Acquisition" -> Epers_Acquisition
-  | "Epers_Adhesion" -> Epers_Adhesion
-  | "Epers_BaptismLDS" -> Epers_BaptismLDS
-  | "Epers_BarMitzvah" -> Epers_BarMitzvah
-  | "Epers_BatMitzvah" -> Epers_BatMitzvah
-  | "Epers_Benediction" -> Epers_Benediction
-  | "Epers_ChangeName" -> Epers_ChangeName
-  | "Epers_Circumcision" -> Epers_Circumcision
-  | "Epers_Confirmation" -> Epers_Confirmation
-  | "Epers_ConfirmationLDS" -> Epers_ConfirmationLDS
-  | "Epers_Decoration" -> Epers_Decoration
-  | "Epers_DemobilisationMilitaire" -> Epers_DemobilisationMilitaire
-  | "Epers_Diploma" -> Epers_Diploma
-  | "Epers_Distinction" -> Epers_Distinction
-  | "Epers_Dotation" -> Epers_Dotation
-  | "Epers_DotationLDS" -> Epers_DotationLDS
-  | "Epers_Education" -> Epers_Education
-  | "Epers_Election" -> Epers_Election
-  | "Epers_Emigration" -> Epers_Emigration
-  | "Epers_Excommunication" -> Epers_Excommunication
-  | "Epers_FamilyLinkLDS" -> Epers_FamilyLinkLDS
-  | "Epers_FirstCommunion" -> Epers_FirstCommunion
-  | "Epers_Funeral" -> Epers_Funeral
-  | "Epers_Graduate" -> Epers_Graduate
-  | "Epers_Hospitalisation" -> Epers_Hospitalisation
-  | "Epers_Illness" -> Epers_Illness
-  | "Epers_Immigration" -> Epers_Immigration
-  | "Epers_ListePassenger" -> Epers_ListePassenger
-  | "Epers_MilitaryDistinction" -> Epers_MilitaryDistinction
-  | "Epers_MilitaryPromotion" -> Epers_MilitaryPromotion
-  | "Epers_MilitaryService" -> Epers_MilitaryService
-  | "Epers_MobilisationMilitaire" -> Epers_MobilisationMilitaire
-  | "Epers_Naturalisation" -> Epers_Naturalisation
-  | "Epers_Occupation" -> Epers_Occupation
-  | "Epers_Ordination" -> Epers_Ordination
-  | "Epers_Property" -> Epers_Property
-  | "Epers_Recensement" -> Epers_Recensement
-  | "Epers_Residence" -> Epers_Residence
-  | "Epers_Retired" -> Epers_Retired
-  | "Epers_ScellentChildLDS" -> Epers_ScellentChildLDS
-  | "Epers_ScellentParentLDS" -> Epers_ScellentParentLDS
-  | "Epers_ScellentSpouseLDS" -> Epers_ScellentSpouseLDS
-  | "Epers_VenteBien" -> Epers_VenteBien
-  | "Epers_Will" -> Epers_Will
-  | s -> failwith s
-
-let to_fevent _base = function
-  | "Efam_Marriage" -> Def.Efam_Marriage
-  | "Efam_NoMarriage" -> Efam_NoMarriage
-  | "Efam_NoMention" -> Efam_NoMention
-  | "Efam_Engage" -> Efam_Engage
-  | "Efam_Divorce" -> Efam_Divorce
-  | "Efam_Separated" -> Efam_Separated
-  | "Efam_Annulation" -> Efam_Annulation
-  | "Efam_MarriageBann" -> Efam_MarriageBann
-  | "Efam_MarriageContract" -> Efam_MarriageContract
-  | "Efam_MarriageLicense" -> Efam_MarriageLicense
-  | "Efam_PACS" -> Efam_PACS
-  | "Efam_Residence" -> Efam_Residence
-  | s -> failwith s
-
-(**
-   [{{ 'foo' | trans }}], [{{ "foo" | trans }}], [{{ trans ("foo") }}]
-   all get converted to [{{ 'foo' | trans }}].
-
-   If the argument (['foo']) contains a ['], double quotes are used.
-  *)
-let trans =
-  func_arg1 @@ function
-  | Tstr s -> Tstr (Printf.sprintf
-                      (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
-  | x -> failwith_type_error_1 "trans" x
 
 let sandbox (conf : Config.config) base =
   let die =
