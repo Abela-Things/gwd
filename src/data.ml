@@ -1035,6 +1035,96 @@ let mk_base base =
       | _ -> raise Not_found
     )
 
+(**
+   [{{ 'foo' | trans }}], [{{ "foo" | trans }}], [{{ trans ("foo") }}]
+   all get converted to [{{ 'foo' | trans }}].
+
+   If the argument (['foo']) contains a ['], double quotes are used.
+  *)
+let trans =
+  func_arg1 @@ function
+  | Tstr s -> Tstr (Printf.sprintf
+                      (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
+  | x -> failwith_type_error_1 "trans" x
+
+
+let jg_printf_aux_opt_flag s i =
+  let rec loop i = match String.get s i with
+    | '-' | '0' | '+' | ' ' -> loop (i + 1)
+    | _ -> i
+  in
+  loop i
+
+let jg_printf_aux_opt_int s i =
+  let rec loop i =
+    match String.get s i with
+    | '0'..'9' -> loop (i + 1)
+    | _ -> i
+  in
+  loop i
+
+let jg_printf_aux_opt_prec s i =
+  if String.get s i <> '.' then i
+  else jg_printf_aux_opt_int s (i + 1)
+
+let jg_printf_aux s =
+  let len = String.length s in
+  let rec loop acc i j =
+    if j = len then List.rev @@ if i = j then acc else `Raw (String.sub s i (j - i)) :: acc
+    else if String.unsafe_get s j = '%' then
+      if i = j
+      then
+        let j' = jg_printf_aux_opt_flag s (j + 1) in
+        let j' = jg_printf_aux_opt_int s j' in
+        let j' = jg_printf_aux_opt_prec s j' in
+        match String.unsafe_get s j' with
+        | '%' -> loop (`Raw ":" :: acc) (j' + 2) (j' + 2)
+        | 'd' -> loop (`Int (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
+        | 'f' -> loop (`Float (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
+        | 's' -> loop (`String (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
+        | c -> failwith @@ Printf.sprintf "jg_printf(\"%s\"): wrong character %c at index %d" s c (j + 1)
+      else
+        loop (`Raw (String.sub s i (j - i)) :: acc) j j
+    else loop acc i (j + 1)
+  in
+  loop [] 0 0
+
+let jg_printf_aux_nb_args instr =
+  List.fold_left (fun acc -> function `Raw _ -> acc | _ -> acc + 1) 0 instr
+
+let jg_printf_prepare instr args =
+  let rec aux acc args cont f =
+    loop (f (List.hd args) :: acc) (List.tl args) cont
+  and loop acc args = function
+    | [] -> assert (args = []) ; List.rev acc
+    | `Raw s :: tl ->
+      loop (s :: acc) args tl
+    | `Int s :: tl ->
+      aux acc args tl @@ fun arg ->
+      Printf.sprintf
+        (Scanf.format_from_string s "%d")
+        (unbox_int (Jg_runtime.jg_int arg))
+    | `String s :: tl ->
+      aux acc args tl @@ fun arg ->
+      Printf.sprintf
+        (Scanf.format_from_string s "%s")
+        (Jg_runtime.string_of_tvalue arg)
+    | `Float s :: tl ->
+      aux acc args tl @@ fun arg ->
+      Printf.sprintf
+        (Scanf.format_from_string s "%f")
+        (unbox_float (Jg_runtime.jg_float arg))
+  in
+  loop [] args instr
+
+let jg_printf = Tfun (fun ?kwargs:_ -> function
+    | Tstr s ->
+      let instr = jg_printf_aux s in
+      let n = jg_printf_aux_nb_args instr in
+      let f args = Tstr (String.concat "" @@ jg_printf_prepare instr args) in
+      Jg_types.func f n
+    | x -> failwith_type_error_1 "jg_printf" x)
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1055,6 +1145,7 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
   :: ("base", mk_base base)
+  :: ("printf", jg_printf)
   :: mk_count ()
 
 let to_pevent _base = function
@@ -1176,4 +1267,5 @@ let sandbox (conf : Config.config) base =
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
   :: ("DATE", module_date conf)
   :: ("trans", trans)
+  :: ("printf", jg_printf)
   :: default_env conf base
