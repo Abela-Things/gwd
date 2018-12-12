@@ -1137,6 +1137,8 @@ let default_env conf base (* p *) =
    * in *)
   let evar = mk_evar conf in
   ("conf", conf_env)
+  :: ("trans", trans)
+  :: ("DATE", module_date conf)
   :: ("i18n", mk_i18n conf)
   :: ("env", mk_env conf)
   :: ("evar", evar)
