@@ -14,11 +14,15 @@ let handler =
   let open RequestHandler in
   { defaultHandler with
 
-    fallback = begin fun mode -> restricted_wizard @@ fun self conf base ->
+    fallback = begin fun mode -> fun self conf base ->
       match mode with
 
       | "SANDBOX" ->
-        Interp.render_jingoo ~file:"sandbox.jingoo" ~models:(Data.sandbox conf base)
+        restricted_wizard
+          (fun _self conf base ->
+             Interp.render_jingoo
+               ~file:"sandbox.jingoo" ~models:(Data.sandbox conf base) )
+          self conf base
 
       | "TIMELINE" ->
         with_person self conf base (fun p ->
