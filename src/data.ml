@@ -172,12 +172,80 @@ and mk_date conf d =
       | _ -> raise Not_found
     )
 
+and to_dmy d =
+  let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
+  { Def.day = int "day" ; month = int "month" ; year = int "year"
+  ; prec = of_prec d
+  ; delta = 0 }
+
+and to_dmy2 d =
+  let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
+  { Def.day2 = int "day" ; month2 = int "month" ; year2 = int "year"
+  ; delta2 = 0 }
+
+and to_prec = function
+  | Def.Sure -> "sure"
+  | About -> "about"
+  | Maybe -> "maybe"
+  | Before -> "before"
+  | After -> "after"
+  | OrYear _ -> "oryear"
+  | YearInt _ -> "yearint"
+
+and of_prec d = match Jg_runtime.jg_obj_lookup d "prec" with
+  | Tstr "sure" -> Def.Sure
+  | Tstr "about" -> About
+  | Tstr "maybe" -> Maybe
+  | Tstr "before" -> Before
+  | Tstr "after" -> After
+  | Tstr "oryear" -> OrYear (to_dmy2 d)
+  | Tstr "yearint" -> YearInt (to_dmy2 d)
+  | _ -> assert false
+
+and to_gregorian_aux calendar d =
+  let d = to_dmy d in
+  match calendar with
+  | "Dgregorian" -> d
+  | "Djulian" -> Calendar.julian_of_gregorian d
+  | "Dfrench" -> Calendar.french_of_gregorian d
+  | "Dhebrew" -> Calendar.hebrew_of_gregorian d
+  | _ -> assert false
+
 and module_date conf =
-  let to_dmy d =
-    let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
-    { Def.day = int "day" ; month = int "month" ; year = int "year" ; prec = Def.Sure ; delta = 0 }
-  in
+  let death_symbol = Date.death_symbol conf in
   Tpat (function
+      | "calendar" -> func_arg2 (fun dst d ->
+          let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "prec" in
+          let convert fn = mk_dmy @@ fn @@ to_gregorian_aux src d in
+          match unbox_string @@ dst with
+          | "Dgregorian" -> convert (fun x -> x)
+          | "Djulian" -> convert Calendar.julian_of_gregorian
+          | "Dfrench" -> convert Calendar.french_of_gregorian
+          | "Dhebrew" -> convert Calendar.hebrew_of_gregorian
+          | s -> failwith @@ "Unknown calendar: " ^ s
+        )
+      | "compare" -> date_compare
+      | "death_symbol" ->
+        Tstr death_symbol
+      | "code_french_year" ->
+        func_arg1 (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
+      | "code_hebrew_date" ->
+        func_arg3 (fun d m y ->
+            box_string @@ Date.code_hebrew_date conf (unbox_int d) (unbox_int m) (unbox_int y))
+      | "string_of_dmy" ->
+        func_arg1 (fun d -> box_string @@ Date.string_of_dmy conf (to_dmy d))
+      | "string_of_on_french_dmy" ->
+        func_arg1 (fun d -> box_string @@ Date.string_of_on_french_dmy conf (to_dmy d))
+      | "string_of_on_hebrew_dmy" ->
+        func_arg1 (fun d -> box_string @@ Date.string_of_on_hebrew_dmy conf (to_dmy d))
+      | "string_of_prec_dmy" ->
+        func_arg3 (fun s1 s2 d ->
+            box_string @@ Date.string_of_prec_dmy conf (unbox_string s1) (unbox_string s2) (to_dmy d))
+      | "eq" -> date_eq
+      | "french_month" ->
+        func_arg1 (fun i -> box_string @@ Date.french_month conf (unbox_int i))
+      | "gregorian_precision" ->
+        func_arg1 (fun d -> box_string @@ Date.gregorian_precision conf (to_dmy d))
       | "string_of_age" -> func_arg1 (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
       | "sub" -> func_arg2 (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
@@ -534,12 +602,18 @@ and mk_time (hh, mm, ss) =
       | "seconds" -> Tstr (Printf.sprintf "%02d" ss)
       | _ -> raise Not_found)
 
-and mk_dmy { Def.day ; month ; year ; delta ; _ } = (* FIXME precision *)
+and mk_dmy { Def.day ; month ; year ; delta ; prec } =
+  let day = Tint day in
+  let month = Tint month in
+  let year = Tint year in
+  let delta = Tint delta in
+  let prec = Tstr (to_prec prec) in
   Tpat (function
-      | "day" -> Tint day
-      | "month" -> Tint month
-      | "year" -> Tint year
-      | "delta" -> Tint delta
+      | "day" -> day
+      | "month" -> month
+      | "year" -> year
+      | "delta" -> delta
+      | "prec" -> prec
       | _ -> raise Not_found
     )
 
@@ -774,7 +848,6 @@ and mk_warning conf base =
                 ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
 
   | PossibleDuplicateFam _ -> assert false (* FIXME *)
-
 
 let mk_conf conf base =
   let _commd_no_params = Tnull in (* FIXME *)
