@@ -195,11 +195,13 @@ and burial
     }
 *)
 
-and death
-(** {b A {!type:death} is either one of these strings:
-    ["NotDead"], ["DeadYoung"], ["DeadDontKnowWhen"], ["DontKnowIfDead"], ["OfCourseDead"],
-    or {!type:__death} object.
-    }
+and death =
+  { death_reason : str
+  ; date: date option
+  }
+(** [death_reason] is either
+    ["DeadYoung"], ["DeadDontKnowWhen"], ["DontKnowIfDead"], ["OfCourseDead"],
+    ["Killed"], ["Murdered"], ["Executed"], ["Disappeared"] or ["Unspecified"].
 *)
 
 and __burial =
@@ -208,14 +210,6 @@ and __burial =
   }
 (** {!recfield:__burial.type_} is actually accessible as [__burial.type] is the templates.
     (written in documentataion as [type_] because [type] is an OCaml keyword.) *)
-
-and __death =
-  { death_reason : str
-  ; date: date
-  }
-(** [death_reason] is either
-    ["Killed"], ["Murdered"], ["Executed"], ["Disappeared"] or ["Unspecified"].
-*)
 
 (** {3 Event } *)
 
