@@ -653,18 +653,20 @@ and mk_death_reason = function
   | Disappeared -> Tstr "Disappeared"
   | Unspecified -> Tstr "Unspecified"
 
-and mk_death conf = function
-  | Def.NotDead -> Tstr "NotDead"
+and mk_death conf =
+  let wrap s = Tpat (function "death_reason" -> Tstr s | _ -> raise Not_found) in
+  function
+  | Def.NotDead -> Tnull
   | Death (r, cd) ->
     let death_reason = mk_death_reason r in
     let date = mk_date conf (Adef.date_of_cdate cd) in
     Tpat (function "death_reason" -> death_reason
                  | "date" -> date
                  | _ -> raise Not_found)
-  | DeadYoung -> Tstr "DeadYoung"
-  | DeadDontKnowWhen -> Tstr "DeadDontKnowWhen"
-  | DontKnowIfDead -> Tstr "DontKnowIfDead"
-  | OfCourseDead -> Tstr "OfCourseDead"
+  | DeadYoung -> wrap "DeadYoung"
+  | DeadDontKnowWhen -> wrap "DeadDontKnowWhen"
+  | DontKnowIfDead -> wrap "DontKnowIfDead"
+  | OfCourseDead -> wrap "OfCourseDead"
 
 and mk_burial conf = function
   | Def.UnknownBurial -> Tstr "UnknownBurial"
