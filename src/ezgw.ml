@@ -1138,7 +1138,7 @@ end
 module Date = struct
 
   let prec conf = function
-    | Dgreg (dmy, _) -> quote_escaped (Date.prec_text conf dmy)
+    | Dgreg (dmy, _) -> Util.escape_html (Date.prec_text conf dmy)
     | _ ->  ""
 
   let day = function

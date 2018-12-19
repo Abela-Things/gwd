@@ -1092,7 +1092,7 @@ let code_varenv =
 
 let mk_evar conf =
   Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
-      | Some vv -> Tstr (Util.quote_escaped vv)
+      | Some vv -> Tstr (Util.escape_html vv)
       | None -> Tnull)
 
 (* TODO: REMOVE *)
