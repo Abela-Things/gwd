@@ -111,9 +111,9 @@ and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   in
   mk_family conf base (ifam, Gwdb.foi base ifam, cpl, m_auth)
 
-and date_compare = func_arg2 date_compare_aux
+and date_compare = func_arg2_no_kw date_compare_aux
 
-and date_eq = func_arg2 (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
+and date_eq = func_arg2_no_kw (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
 and mk_date conf d =
   let lazy_field fn =
@@ -126,7 +126,7 @@ and mk_date conf d =
   let day = lazy_field (fun d _ -> Tint d.Def.day) in
   let string_of_age = lazy_field (fun d _ -> Tstr (Date.string_of_age conf d)) in
   let string_of_date_sep =
-    func_arg1
+    func_arg1_no_kw
       (function Tstr sep -> Tstr (Date.string_of_date_sep conf sep d)
               | x -> failwith_type_error_1 "string_of_date_sep" x)
   in
@@ -214,7 +214,7 @@ and to_gregorian_aux calendar d =
 and module_date conf =
   let death_symbol = Date.death_symbol conf in
   Tpat (function
-      | "calendar" -> func_arg2 (fun dst d ->
+      | "calendar" -> func_arg2_no_kw (fun dst d ->
           let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "prec" in
           let convert fn = mk_dmy @@ fn @@ to_gregorian_aux src d in
           match unbox_string @@ dst with
@@ -228,26 +228,26 @@ and module_date conf =
       | "death_symbol" ->
         Tstr death_symbol
       | "code_french_year" ->
-        func_arg1 (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
+        func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
       | "code_hebrew_date" ->
-        func_arg3 (fun d m y ->
+        func_arg3_no_kw (fun d m y ->
             box_string @@ Date.code_hebrew_date conf (unbox_int d) (unbox_int m) (unbox_int y))
       | "string_of_dmy" ->
-        func_arg1 (fun d -> box_string @@ Date.string_of_dmy conf (to_dmy d))
+        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_dmy conf (to_dmy d))
       | "string_of_on_french_dmy" ->
-        func_arg1 (fun d -> box_string @@ Date.string_of_on_french_dmy conf (to_dmy d))
+        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_on_french_dmy conf (to_dmy d))
       | "string_of_on_hebrew_dmy" ->
-        func_arg1 (fun d -> box_string @@ Date.string_of_on_hebrew_dmy conf (to_dmy d))
+        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_on_hebrew_dmy conf (to_dmy d))
       | "string_of_prec_dmy" ->
-        func_arg3 (fun s1 s2 d ->
+        func_arg3_no_kw (fun s1 s2 d ->
             box_string @@ Date.string_of_prec_dmy conf (unbox_string s1) (unbox_string s2) (to_dmy d))
       | "eq" -> date_eq
       | "french_month" ->
-        func_arg1 (fun i -> box_string @@ Date.french_month conf (unbox_int i))
+        func_arg1_no_kw (fun i -> box_string @@ Date.french_month conf (unbox_int i))
       | "gregorian_precision" ->
-        func_arg1 (fun d -> box_string @@ Date.gregorian_precision conf (to_dmy d))
-      | "string_of_age" -> func_arg1 (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
-      | "sub" -> func_arg2 (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
+        func_arg1_no_kw (fun d -> box_string @@ Date.gregorian_precision conf (to_dmy d))
+      | "string_of_age" -> func_arg1_no_kw (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
+      | "sub" -> func_arg2_no_kw (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
     )
 
@@ -1034,7 +1034,7 @@ let mk_env conf =
 
 
 let mk_i18n conf =
-  func_arg1 @@ function
+  func_arg1_no_kw @@ function
   | Tstr arg ->
      let len = String.length arg in
      let ri = String.rindex arg ']' in
@@ -1045,28 +1045,28 @@ let mk_i18n conf =
 
 (* TODO: remove base *)
 let translate conf (* base *) =
-  let decline = func_arg2 @@ fun s1 s2 ->
+  let decline = func_arg2_no_kw @@ fun s1 s2 ->
     try Tstr (Util.transl_decline conf (unbox_string s1) (unbox_string s2))
     with _ -> failwith_type_error_2 "translate" s1 s2
   in
-  let nth = func_arg2 @@ fun a1 a2 ->  match a1, a2 with
+  let nth = func_arg2_no_kw @@ fun a1 a2 ->  match a1, a2 with
     | Tstr s, Tint i -> Tstr (Util.transl_nth conf s i)
     | Tstr s, Tstr i -> Tstr (Util.transl_nth conf s @@ int_of_string i)
     | _ -> failwith_type_error_2 "nth" a1 a2
   in
-  let transl_a_of_b = func_arg2 @@ fun x y ->
+  let transl_a_of_b = func_arg2_no_kw @@ fun x y ->
     try Tstr (Util.transl_a_of_b conf (unbox_string x) (unbox_string y))
     with _ -> failwith_type_error_2 "a_of_b" x y
   in
-  let transl_a_of_gr_eq_gen_lev = func_arg2 @@ fun x y ->
+  let transl_a_of_gr_eq_gen_lev = func_arg2_no_kw @@ fun x y ->
     try Tstr (Util.transl_a_of_gr_eq_gen_lev conf (unbox_string x) (unbox_string y))
     with _ -> failwith_type_error_2 "a_of_gr_eq_gen_lev" x y
   in
-  let transl = func_arg1 @@ fun x ->
+  let transl = func_arg1_no_kw @@ fun x ->
     try Tstr (Util.transl conf (unbox_string x))
     with _ -> failwith_type_error_1 "transl" x
   in
-  let ftransl = func_arg2 @@ fun x y ->
+  let ftransl = func_arg2_no_kw @@ fun x y ->
     match x, y with
     | Tstr s, Tint i -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
     | Tstr s, Tstr s' -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
@@ -1081,12 +1081,12 @@ let translate conf (* base *) =
                | x -> failwith x)
 
 let decode_varenv =
-  func_arg1 @@ fun str ->
+  func_arg1_no_kw @@ fun str ->
   try Tstr (Wserver.decode @@ unbox_string str)
   with _ -> failwith_type_error_1 "decode_varenv" str
 
 let code_varenv =
-  func_arg1 @@ fun str ->
+  func_arg1_no_kw @@ fun str ->
   try Tstr (Wserver.encode @@ unbox_string str)
   with _ -> failwith_type_error_1 "decode_varenv" str
 
@@ -1117,7 +1117,7 @@ let mk_base base =
    If the argument (['foo']) contains a ['], double quotes are used.
   *)
 let trans =
-  func_arg1 @@ function
+  func_arg1_no_kw @@ function
   | Tstr s -> Tstr (Printf.sprintf
                       (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
   | x -> failwith_type_error_1 "trans" x
@@ -1196,7 +1196,7 @@ let jg_printf = Tfun (fun ?kwargs:_ -> function
       let instr = jg_printf_aux s in
       let n = jg_printf_aux_nb_args instr in
       let f args = Tstr (String.concat "" @@ jg_printf_prepare instr args) in
-      Jg_types.func f n
+      Jg_types.func_no_kw f n
     | x -> failwith_type_error_1 "jg_printf" x)
 
 let default_env conf base (* p *) =
@@ -1242,13 +1242,13 @@ let sandbox (conf : Config.config) base =
       | Tlazy _ -> Printf.sprintf "Tlazy"
       | Tvolatile _ -> Printf.sprintf "Tvolatile"
     in
-    func_arg1 @@ fun x -> Tstr (printer x)
+    func_arg1_no_kw @@ fun x -> Tstr (printer x)
   in
-  let get_person = func_arg1 @@ function
+  let get_person = func_arg1_no_kw @@ function
     | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
     | x -> failwith_type_error_1 "GET_PERSON" x
   in
-  let get_family = func_arg1 @@ function
+  let get_family = func_arg1_no_kw @@ function
     | Tint i ->
       let ifam = Adef.ifam_of_int i in
       let cpl = Gwdb.foi base ifam in
