@@ -206,17 +206,17 @@ and to_gregorian_aux calendar d =
   let d = to_dmy d in
   match calendar with
   | "Dgregorian" -> d
-  | "Djulian" -> Calendar.julian_of_gregorian d
-  | "Dfrench" -> Calendar.french_of_gregorian d
-  | "Dhebrew" -> Calendar.hebrew_of_gregorian d
-  | _ -> assert false
+  | "Djulian" -> Calendar.gregorian_of_julian d
+  | "Dfrench" -> Calendar.gregorian_of_french d
+  | "Dhebrew" -> Calendar.gregorian_of_hebrew d
+  | x -> print_endline @@ Printf.sprintf "%s: %s" __LOC__ x ; assert false
 
 and module_date conf =
   let death_symbol = Date.death_symbol conf in
   Tpat (function
       | "calendar" -> func_arg2_no_kw (fun dst d ->
-          let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "prec" in
-          let convert fn = mk_dmy @@ fn @@ to_gregorian_aux src d in
+          (* let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "calendar" in *)
+          let convert fn = mk_dmy @@ fn @@ to_dmy (* @@ to_gregorian_aux src *) d in
           match unbox_string @@ dst with
           | "Dgregorian" -> convert (fun x -> x)
           | "Djulian" -> convert Calendar.julian_of_gregorian
@@ -229,23 +229,7 @@ and module_date conf =
         Tstr death_symbol
       | "code_french_year" ->
         func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
-      | "code_hebrew_date" ->
-        func_arg3_no_kw (fun d m y ->
-            box_string @@ Date.code_hebrew_date conf (unbox_int d) (unbox_int m) (unbox_int y))
-      | "string_of_dmy" ->
-        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_dmy conf (to_dmy d))
-      | "string_of_on_french_dmy" ->
-        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_on_french_dmy conf (to_dmy d))
-      | "string_of_on_hebrew_dmy" ->
-        func_arg1_no_kw (fun d -> box_string @@ Date.string_of_on_hebrew_dmy conf (to_dmy d))
-      | "string_of_prec_dmy" ->
-        func_arg3_no_kw (fun s1 s2 d ->
-            box_string @@ Date.string_of_prec_dmy conf (unbox_string s1) (unbox_string s2) (to_dmy d))
       | "eq" -> date_eq
-      | "french_month" ->
-        func_arg1_no_kw (fun i -> box_string @@ Date.french_month conf (unbox_int i))
-      | "gregorian_precision" ->
-        func_arg1_no_kw (fun d -> box_string @@ Date.gregorian_precision conf (to_dmy d))
       | "string_of_age" -> func_arg1_no_kw (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
       | "sub" -> func_arg2_no_kw (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
