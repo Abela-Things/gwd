@@ -65,11 +65,9 @@ let rec mk_family (conf : Config.config) base fcd =
   let is_no_mention = get_bool E.is_no_mention in
   let is_no_sexes_check = get_bool E.is_no_sexes_check in
   let ifam = get_int E.ifam in
-  let has_witnesses = get_bool E.has_witnesses in
-  let witnesses =
-    Tlazy (lazy (get box_array @@
-                 fun fcd -> Array.map (get_n_mk_person conf base) @@
-                 E.witnesses fcd))
+  let witnesses = match E.witnesses fcd with
+    | [||] -> Tarray [||]
+    | w -> Tlazy (lazy (box_array @@ Array.map (get_n_mk_person conf base) w))
   in
   let origin_file = Tlazy (lazy (get_str (E.origin_file conf base))) in
   Tpat (function
@@ -81,7 +79,6 @@ let rec mk_family (conf : Config.config) base fcd =
       | "divorce_date" -> divorce_date
       | "children" -> children
       | "father" -> father
-      | "has_witnesses" -> has_witnesses
       | "ifam" -> ifam
       | "is_no_mention" -> is_no_mention
       | "is_no_sexes_check" -> is_no_sexes_check
@@ -116,22 +113,15 @@ and date_compare = func_arg2_no_kw date_compare_aux
 and date_eq = func_arg2_no_kw (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
 and mk_date conf d =
-  let lazy_field fn =
-    Tlazy (lazy (match d with
-        | Def.Dtext _ -> Tnull
-        | Dgreg (d, c) -> fn d c) )
+  let opt =
+    match d with
+    | Def.Dtext _ -> fun _ -> Tnull
+    | Dgreg (d, c) -> fun fn -> fn d c
   in
-  let year = lazy_field (fun d _ -> Tint d.Def.year) in
-  let month = lazy_field (fun d _ -> Tint d.Def.month) in
-  let day = lazy_field (fun d _ -> Tint d.Def.day) in
-  let string_of_age = lazy_field (fun d _ -> Tstr (Date.string_of_age conf d)) in
-  let string_of_date_sep =
-    func_arg1_no_kw
-      (function Tstr sep -> Tstr (Date.string_of_date_sep conf sep d)
-              | x -> failwith_type_error_1 "string_of_date_sep" x)
-  in
-  let string_of_ondate = Tlazy (lazy (Tstr (Date.string_of_ondate conf d)) ) in
-  let prec = lazy_field (fun d _ -> Tstr (match d.Def.prec with
+  let year = opt (fun d _ -> Tint d.Def.year) in
+  let month = opt (fun d _ -> Tint d.Def.month) in
+  let day = opt (fun d _ -> Tint d.Def.day) in
+  let prec = opt (fun d _ -> Tstr (match d.Def.prec with
       | Def.Sure -> "sure"
       | About -> "about"
       | Maybe -> "maybe"
@@ -141,7 +131,7 @@ and mk_date conf d =
       | YearInt _ -> "yearint")
     )
   in
-  let d2 = lazy_field (fun d c -> match d.Def.prec with
+  let d2 = opt (fun d c -> match d.Def.prec with
       | OrYear d2 | YearInt d2 ->
         mk_date conf (Def.Dgreg ( { Def.day = d2.Def.day2
                                   ; month = d2.Def.month2
@@ -151,7 +141,7 @@ and mk_date conf d =
       | _ -> Tnull )
   in
   let calendar =
-    lazy_field (fun _ -> function
+    opt (fun _ -> function
         | Dgregorian -> Tstr "Dgregorian"
         | Djulian -> Tstr "Djulian"
         | Dfrench -> Tstr "Dfrench"
@@ -163,9 +153,6 @@ and mk_date conf d =
       | "day" -> day
       | "month" -> month
       | "prec" -> prec
-      | "string_of_age" -> string_of_age
-      | "string_of_date_sep" -> string_of_date_sep
-      | "string_of_ondate" -> string_of_ondate
       | "year" -> year
       | "__compare__" -> date_compare
       | "__eq__" -> date_eq
@@ -212,7 +199,31 @@ and to_gregorian_aux calendar d =
   | x -> print_endline @@ Printf.sprintf "%s: %s" __LOC__ x ; assert false
 
 and module_date conf =
+  let now =
+    Tvolatile (fun () ->
+        let now = Unix.gmtime @@ Unix.time () in
+        let day = Tint now.tm_mday in
+        let month = Tint (now.tm_mon + 1) in
+        let year = Tint (now.tm_year + 1900) in
+        Tpat (function
+            | "day" -> day
+            | "month" -> month
+            | "year" -> year
+            | "prec" -> Tstr "sure"
+            | _ -> raise Not_found)
+      )
+  in
   let death_symbol = Date.death_symbol conf in
+  let string_of_ondate =
+    func_arg1_no_kw @@ fun d ->
+    Tlazy (lazy (Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) ) ) )
+  in
+  let code_french_year =
+    func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
+  in
+  let string_of_age =
+    func_arg1_no_kw (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
+  in
   Tpat (function
       | "calendar" -> func_arg2_no_kw (fun dst d ->
           (* let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "calendar" in *)
@@ -225,25 +236,18 @@ and module_date conf =
           | s -> failwith @@ "Unknown calendar: " ^ s
         )
       | "compare" -> date_compare
-      | "death_symbol" ->
-        Tstr death_symbol
-      | "code_french_year" ->
-        func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
+      | "death_symbol" -> Tstr death_symbol
+      | "code_french_year" -> code_french_year
       | "eq" -> date_eq
-      | "string_of_age" -> func_arg1_no_kw (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
+      | "now" -> now
+      | "string_of_age" -> string_of_age
+      | "string_of_ondate" -> string_of_ondate
       | "sub" -> func_arg2_no_kw (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
     )
 
 and get_n_mk_person conf base (i : Adef.iper) =
-  (* TODO: ensure security *)
-  (* get_access *)
-  (* is_hide_names *)
-  let p = Gwdb.poi base i in
-  unsafe_mk_person conf base @@
-  if Util.authorized_age conf base p
-  then p
-  else Gwdb.empty_person base i
+  unsafe_mk_person conf base (Util.pget conf base i)
 
 and mk_relation conf base r =
   let module E = Ezgw.Relation in
@@ -286,7 +290,7 @@ and mk_witness_kind = function
 and mk_event conf base d =
   let module E = Ezgw.Event in
   let date = match E.date d with Some d -> mk_date conf d | None -> Tnull in
-  let name = Tstr (E.name conf base d)  in
+  let name = Tstr (E.name conf base d) in
   let spouse =
     Tlazy (lazy (try unsafe_mk_person conf base @@ E.spouse base d
                  with Not_found -> Tnull))
@@ -320,19 +324,25 @@ and mk_event conf base d =
                | "witnesses" -> witnesses
                | _ -> raise Not_found)
 
-and mk_title _conf _base (_nth, _name, _title, _places, _dates) =
-  Tnull
-(* FIXME *)
-  (* let nth = Tint nth in
-   * let name = match name with
-   *   | Tmain
-   *   | Tname str -> sou base n
-   *   | Tnone -> failwith __LOC__
-   * in
-   * let dates =
-   *   List.map
-   *     (fun (start, stop) -> Tnull)
-   *     dates *)
+and mk_title conf base t =
+  let ident = Tstr (Gwdb.sou base t.Def.t_ident) in
+  let name = match t.t_name with
+    | Tmain -> Tstr ""
+    | Tname s -> Tstr (Gwdb.sou base s)
+    | Tnone -> Tnull
+  in
+  let place = Tstr (Gwdb.sou base t.t_place) in
+  let date_start = mk_opt (mk_date conf) (Adef.od_of_cdate t.t_date_start) in
+  let date_end = mk_opt (mk_date conf) (Adef.od_of_cdate t.t_date_start) in
+  let nth = Tint t.t_nth in
+  Tpat (function
+      | "ident" -> ident
+      | "name" -> name
+      | "place" -> place
+      | "date_start" -> date_start
+      | "date_end" -> date_end
+      | "nth" -> nth
+      | _ -> raise Not_found)
 
 and unsafe_mk_person conf base (p : Gwdb.person) =
   (* match Perso_link.get_father_link conf.command (get_key_index a) with
@@ -362,6 +372,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let iper' = Gwdb.get_key_index p in
   let access = get_str (E.access conf base) in
   let age = get mk_dmy (E.age conf) in
+  let baptism_date = mk_opt (mk_date conf) (E.baptism_date p) in
   let baptism_place = get_str (E.baptism_place conf base) in
   let birth_date = mk_opt (mk_date conf) (E.birth_date p) in
   let birth_place = get_str (E.birth_place conf base) in
@@ -373,7 +384,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
           List.map (get_n_mk_person conf base) (E.children base p))
   in
   let consanguinity = get_float (E.consanguinity) in
-  let cop = get_str (Util.child_of_parent conf base) in
   let cremation_place = get_str (E.cremation_place conf base) in
   let date = get_str (Date.short_dates_text conf base) in
   let dates = get_str (E.dates conf base) in
@@ -402,25 +412,9 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   in
   let first_name_key = get_str (E.first_name_key base) in
   let first_name_key_val = get_str (E.first_name_key_val base) in
-  let has_children = get_bool (E.has_children conf base) in
-  let has_event = get_bool (E.has_event conf base) in
-  let has_image = get_bool (E.has_image conf base) in
-  let has_parents = get_bool (E.has_parents conf) in
-  let has_relations = get_bool (E.has_relations conf base) in
-  let has_siblings = get_bool (E.has_siblings conf base) in
   let image_url = get_str (fun p -> E.image_url conf base p) in
   let iper = Tint (Adef.int_of_iper iper') in
   let is_birthday = get_bool (E.is_birthday conf) in
-  let is_buried = get_bool (E.is_buried) in
-  let is_certainly_dead = get_bool (E.is_certainly_dead) in
-  let is_computable_age = get_bool (E.is_computable_age) in
-  let is_computable_death_age = get_bool (E.is_computable_death_age) in
-  let is_cremated = get_bool (E.is_cremated) in
-  let is_dead = get_bool (E.is_dead) in
-  let is_female = get_bool E.is_female in
-  let is_invisible = get_bool (E.is_invisible conf base) in
-  let is_male = get_bool E.is_male in
-  let is_restricted = get_bool E.is_restricted in
   let linked_page =
     box_lazy @@
     lazy (let fn = E.linked_page conf base p in Tpat (fun s -> Tstr (fn s) ) )
@@ -430,8 +424,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let nb_families = get_int (E.nb_families conf) in
   let nobility_titles =
     box_lazy @@
-    lazy (box_list @@
-          List.map (mk_title conf base) @@ E.nobility_titles conf base p)
+    lazy (box_list @@ List.map (mk_title conf base) @@ E.nobility_titles conf base p)
   in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
@@ -467,14 +460,10 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let source_burial = get_str @@ E.source_burial base in
   let source_death = get_str @@ E.source_death base in
   let source_fsource =
-    box_array @@
-    Array.map box_string @@
-    E.source_fsource conf base p
+    box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_fsource conf base p)
   in
   let source_marriage =
-    box_array @@
-    Array.map box_string @@
-    E.source_marriage conf base p
+    box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_marriage conf base p)
   in
   let source_psources = get_str @@ E.source_psources base in
   let static_max_ancestor_level =
@@ -489,18 +478,17 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
-  let title = get_str (E.title conf base) in
   Tlazy (lazy (Tpat
                  (function
                    | "access" -> access
                    | "age" -> age
+                   | "baptism_date" -> baptism_date
                    | "baptism_place" -> baptism_place
                    | "birth_date" -> birth_date
                    | "birth_place" -> birth_place
                    | "burial" -> burial
                    | "burial_place" -> burial_place
                    | "children" -> children
-                   | "cop" -> cop
                    | "cremation_place" -> cremation_place
                    | "consanguinity" -> consanguinity
                    | "date" -> date
@@ -518,30 +506,13 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "first_name_key" -> first_name_key
                    | "first_name_key_val" -> first_name_key_val
                    | "half_siblings" -> half_siblings
-                   | "has_children" -> has_children
-                   | "has_event" -> has_event
-                   | "has_image" -> has_image
-                   | "has_parents" -> has_parents
-                   | "has_relations" -> has_relations
-                   | "has_siblings" -> has_siblings
                    | "image_url" -> image_url
                    | "iper" -> iper
                    | "is_birthday" -> is_birthday
-                   | "is_buried" -> is_buried
-                   | "is_certainly_dead" -> is_certainly_dead
-                   | "is_computable_age" -> is_computable_age
-                   | "is_computable_death_age" -> is_computable_death_age
-                   | "is_cremated" -> is_cremated
-                   | "is_dead" -> is_dead
-                   | "is_invisible" -> is_invisible
-                   | "is_male" -> is_male
-                   | "is_female" -> is_female
-                   | "is_restricted" -> is_restricted
                    | "linked_page" -> linked_page
                    | "max_ancestor_level" -> max_ancestor_level
                    | "mother" -> mother
                    | "nb_families" -> nb_families
-                   | "nobility_titles" -> nobility_titles
                    | "occ" -> occ
                    | "occupation" -> occupation
                    | "on_baptism_date" -> on_baptism_date
@@ -569,7 +540,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
                    | "surname_aliases" -> surname_aliases
                    | "surname_key" -> surname_key
                    | "surname_key_val" -> surname_key_val
-                   | "title" -> title
+                   | "titles" -> nobility_titles
                    | "__str__" -> str__
                    | _ -> raise Not_found
                  )
@@ -609,15 +580,17 @@ and mk_dmy { Def.day ; month ; year ; delta ; prec } =
       | _ -> raise Not_found
     )
 
+(* TODO: remove and replace with generic mk_event *)
 and mk_fevent conf base e =
   Tpat (function "efam_name" -> Tstr (Util.string_of_fevent_name conf base e.Def.efam_name)
                | _ -> raise Not_found)
 
+(* TODO: remove and replace with generic mk_event *)
 and mk_pevent conf base e =
   let epers_name = Tstr (Util.string_of_pevent_name conf base e.Def.epers_name) in
   Tpat (function "epers_name" -> epers_name
                | "date" -> Tnull
-               | "familly" -> Tnull
+               | "family" -> Tnull
                | "note" -> Tnull
                | "place" -> Tnull
                | "witnesses" -> Tnull
@@ -661,7 +634,7 @@ and mk_death conf =
   | OfCourseDead -> wrap "OfCourseDead"
 
 and mk_burial conf = function
-  | Def.UnknownBurial -> Tstr "UnknownBurial"
+  | Def.UnknownBurial -> Tnull
   | Buried d ->
     let type_ = Tstr "Buried" in
     let date = match Adef.od_of_cdate d with
@@ -688,7 +661,7 @@ and mk_warning conf base =
     let ifath = Gwdb.get_father cpl in
     let imoth = Gwdb.get_mother cpl in
     (* spouse if not used so it should be okay *)
-    mk_family conf base (ifam, Gwdb.foi base ifam, (ifath, imoth, imoth), true)
+    mk_family conf base (ifam, cpl, (ifath, imoth, imoth), true)
   in
   let array_of_list_map : 'a 'b . ('a -> 'b) -> 'a list -> 'b array =
     fun fn l ->
@@ -1024,17 +997,6 @@ let mk_env conf =
       | _ -> raise Not_found
     )
 
-
-let mk_i18n conf =
-  func_arg1_no_kw @@ function
-  | Tstr arg ->
-     let len = String.length arg in
-     let ri = String.rindex arg ']' in
-     let c = if ri = len - 1 then "" else String.sub arg (ri + 1) (len - ri - 1) in
-     let s = String.sub arg 1 (len - 1 - (len - ri)) in
-     Tstr (Templ.eval_transl conf false s c)
-  | x -> failwith_type_error_1 "i18n" x
-
 (* TODO: remove base *)
 let translate conf (* base *) =
   let decline = func_arg2_no_kw @@ fun s1 s2 ->
@@ -1087,14 +1049,6 @@ let mk_evar conf =
       | Some vv -> Tstr ((* Util.escape_html *) vv)
       | None -> Tnull)
 
-(* TODO: REMOVE *)
-let mk_count () =
-  let count = ref 0 in
-  [ ( "count", Tvolatile (fun () -> Tint !count) )
-  ; ( "incr_count", Tvolatile (fun () -> incr count ; Tnull ) )
-  ; ( "reset_count", Tvolatile (fun () -> count := 0 ; Tnull ) )
-  ]
-
 let mk_base base =
   Tpat (function
       | "nb_of_persons" -> Tint (Gwdb.nb_of_persons base)
@@ -1114,83 +1068,6 @@ let trans =
                       (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
   | x -> failwith_type_error_1 "trans" x
 
-let jg_printf_aux_opt_flag s i =
-  let rec loop i = match String.get s i with
-    | '-' | '0' | '+' | ' ' -> loop (i + 1)
-    | _ -> i
-  in
-  loop i
-
-let jg_printf_aux_opt_int s i =
-  let rec loop i =
-    match String.get s i with
-    | '0'..'9' -> loop (i + 1)
-    | _ -> i
-  in
-  loop i
-
-let jg_printf_aux_opt_prec s i =
-  if String.get s i <> '.' then i
-  else jg_printf_aux_opt_int s (i + 1)
-
-let jg_printf_aux s =
-  let len = String.length s in
-  let rec loop acc i j =
-    if j = len then List.rev @@ if i = j then acc else `Raw (String.sub s i (j - i)) :: acc
-    else if String.unsafe_get s j = '%' then
-      if i = j
-      then
-        let j' = jg_printf_aux_opt_flag s (j + 1) in
-        let j' = jg_printf_aux_opt_int s j' in
-        let j' = jg_printf_aux_opt_prec s j' in
-        match String.unsafe_get s j' with
-        | '%' -> loop (`Raw ":" :: acc) (j' + 2) (j' + 2)
-        | 'd' -> loop (`Int (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
-        | 'f' -> loop (`Float (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
-        | 's' -> loop (`String (String.sub s i (j' - i + 1)) :: acc) (j' + 1) (j' + 1)
-        | c -> failwith @@ Printf.sprintf "jg_printf(\"%s\"): wrong character %c at index %d" s c (j + 1)
-      else
-        loop (`Raw (String.sub s i (j - i)) :: acc) j j
-    else loop acc i (j + 1)
-  in
-  loop [] 0 0
-
-let jg_printf_aux_nb_args instr =
-  List.fold_left (fun acc -> function `Raw _ -> acc | _ -> acc + 1) 0 instr
-
-let jg_printf_prepare instr args =
-  let rec aux acc args cont f =
-    loop (f (List.hd args) :: acc) (List.tl args) cont
-  and loop acc args = function
-    | [] -> assert (args = []) ; List.rev acc
-    | `Raw s :: tl ->
-      loop (s :: acc) args tl
-    | `Int s :: tl ->
-      aux acc args tl @@ fun arg ->
-      Printf.sprintf
-        (Scanf.format_from_string s "%d")
-        (unbox_int (Jg_runtime.jg_int arg))
-    | `String s :: tl ->
-      aux acc args tl @@ fun arg ->
-      Printf.sprintf
-        (Scanf.format_from_string s "%s")
-        (Jg_runtime.string_of_tvalue arg)
-    | `Float s :: tl ->
-      aux acc args tl @@ fun arg ->
-      Printf.sprintf
-        (Scanf.format_from_string s "%f")
-        (unbox_float (Jg_runtime.jg_float arg))
-  in
-  loop [] args instr
-
-let jg_printf = Tfun (fun ?kwargs:_ -> function
-    | Tstr s ->
-      let instr = jg_printf_aux s in
-      let n = jg_printf_aux_nb_args instr in
-      let f args = Tstr (String.concat "" @@ jg_printf_prepare instr args) in
-      Jg_types.func_no_kw f n
-    | x -> failwith_type_error_1 "jg_printf" x)
-
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1205,7 +1082,6 @@ let default_env conf base (* p *) =
   ("conf", conf_env)
   :: ("trans", trans)
   :: ("DATE", module_date conf)
-  :: ("i18n", mk_i18n conf)
   :: ("env", mk_env conf)
   :: ("evar", evar)
   (* :: ("initCache", initCache) *)
@@ -1213,9 +1089,8 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
   :: ("base", mk_base base)
-  :: ("printf", jg_printf)
   :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
-  :: mk_count ()
+  :: []
 
 let sandbox (conf : Config.config) base =
   let die =
@@ -1256,5 +1131,5 @@ let sandbox (conf : Config.config) base =
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
   :: ("DATE", module_date conf)
   :: ("trans", trans)
-  :: ("printf", jg_printf)
+  :: ("printf", Jg_types.func_arg1_no_kw Jg_runtime.jg_printf)
   :: default_env conf base
