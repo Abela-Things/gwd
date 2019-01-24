@@ -279,6 +279,10 @@ and mk_related conf base r =
       | _ -> raise Not_found
     )
 
+and mk_witness_kind = function
+  | Def.Witness -> Tstr "WITNESS"
+  | Def.Witness_GodParent -> Tstr "WITNESS_GODPARENT"
+
 and mk_event conf base d =
   let module E = Ezgw.Event in
   let date = match E.date d with Some d -> mk_date conf d | None -> Tnull in
@@ -289,14 +293,19 @@ and mk_event conf base d =
   in
   let kind = Tstr (E.kind base d) in
   let witnesses =
-    Tlazy (lazy (Tarray (Array.map (fun (i, k) ->
-        let p = get_n_mk_person conf base i in
-        let unbox p = unbox_pat (Lazy.force (unbox_lazy p)) in
-        let sex = Ezgw.sex_of_index @@ unbox_int @@ unbox p @@ "sex" in
-        let k = Util.string_of_witness_kind conf sex k in
-        Tpat (function "kind" -> Tstr k
-                     | s -> (unbox p) s) )
-        (E.witnesses d) ) ) )
+    match E.witnesses d with
+    | [||] -> Tarray [||]
+    | w ->
+      let lw = lazy (Array.map (fun (i, _) -> get_n_mk_person conf base i) w) in
+      (* We may want to filter on [ip] or [k] before really accessing the person entity *)
+      Tarray (Array.mapi (fun i (ip, k) ->
+          let kind = mk_witness_kind k in
+          let iper = Tint (Adef.int_of_iper ip) in
+          Tpat (function
+              | "kind" -> kind
+              | "iper" -> iper
+              | s -> unbox_pat (Lazy.force lw).(i) @@ s) )
+          w )
   in
   let place = Tstr (E.place conf base d) in
   let src = Tstr (E.src base d) in
@@ -443,10 +452,9 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
           E.related conf base p)
   in
   let relations =
-    box_lazy @@
-    lazy (box_list @@
-          List.map (fun x -> mk_relation conf base (x, None)) @@ (* FIXME *)
-          E.relations p)
+    match E.relations p with
+    | [] -> Tlist []
+    | r -> box_lazy @@ lazy (box_list @@ List.map (get_n_mk_person conf base) r)
   in
   let sex = get_int E.sex in
   let siblings_aux fn =
@@ -1076,7 +1084,7 @@ let code_varenv =
 
 let mk_evar conf =
   Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
-      | Some vv -> Tstr (Util.escape_html vv)
+      | Some vv -> Tstr ((* Util.escape_html *) vv)
       | None -> Tnull)
 
 (* TODO: REMOVE *)
@@ -1206,6 +1214,7 @@ let default_env conf base (* p *) =
   :: ("translate", translate conf)
   :: ("base", mk_base base)
   :: ("printf", jg_printf)
+  :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
   :: mk_count ()
 
 let sandbox (conf : Config.config) base =

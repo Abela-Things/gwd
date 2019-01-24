@@ -868,9 +868,6 @@ module Person = struct
 
   let pnote = notes
 
-  let relations p =
-    get_rparents p
-
   let related conf base p =
     List.sort
       (fun (c1, _) (c2, _) ->
@@ -891,6 +888,8 @@ module Person = struct
             | _ -> acc)
           list (get_rparents c) )
       [] (List.sort_uniq compare (get_related p))
+
+  let relations p = get_related p
 
   let siblings base p =
     match get_parents p with
@@ -1116,12 +1115,6 @@ module Person = struct
   let surname_aliases base p =
     List.map (sou base) (get_surnames_aliases p)
 
-  let surname_begin base p =
-    surname_begin base (p_surname base p)
-
-  let surname_end base p =
-    surname_end base (p_surname base p)
-
   let surname_key base p =
     code_varenv (Name.lower (p_surname base p))
 
@@ -1138,7 +1131,7 @@ end
 module Date = struct
 
   let prec conf = function
-    | Dgreg (dmy, _) -> Util.escape_html (Date.prec_text conf dmy)
+    | Dgreg (dmy, _) -> Date.prec_text conf dmy
     | _ ->  ""
 
   let day = function
