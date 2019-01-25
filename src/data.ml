@@ -1056,17 +1056,23 @@ let mk_base base =
       | _ -> raise Not_found
     )
 
-(**
-   [{{ 'foo' | trans }}], [{{ "foo" | trans }}], [{{ trans ("foo") }}]
-   all get converted to [{{ 'foo' | trans }}].
+let stringify s =
+  Printf.sprintf (if String.contains s '\'' then "\"%s\"" else "'%s'") s
 
-   If the argument (['foo']) contains a ['], double quotes are used.
-  *)
-let trans =
+let twigify filter =
   func_arg1_no_kw @@ function
-  | Tstr s -> Tstr (Printf.sprintf
-                      (if String.contains s '\'' then "{{ \"%s\" | trans }}" else "{{ '%s' | trans }}") s)
-  | x -> failwith_type_error_1 "trans" x
+  | Tstr s ->
+    let s =
+      let len = String.length s in
+      if len = 0 then ""
+      else if String.get s 0 = '{' && String.get s (len - 1) = '}'
+      then String.sub s 2 (len - 4)
+      else stringify s
+    in
+    Tstr (Printf.sprintf "{{%s|%s}}" s filter)
+  | x -> failwith_type_error_1 filter x
+
+let twig = Tpat (fun s -> twigify s)
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
@@ -1079,8 +1085,7 @@ let default_env conf base (* p *) =
    *     | _ -> assert false)
    * in *)
   let evar = mk_evar conf in
-  ("conf", conf_env)
-  :: ("trans", trans)
+  ("TWIG", twig)
   :: ("DATE", module_date conf)
   :: ("env", mk_env conf)
   :: ("evar", evar)
@@ -1089,29 +1094,11 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("translate", translate conf)
   :: ("base", mk_base base)
+  :: ("conf", conf_env)
   :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
   :: []
 
 let sandbox (conf : Config.config) base =
-  let die =
-    let rec printer = function
-      | Tint x -> Printf.sprintf "Tint %d" x
-      | Tfloat x -> Printf.sprintf "Tfloat %f" x
-      | Tstr x -> Printf.sprintf "Tstr %s" (String.escaped x)
-      | Tbool x -> Printf.sprintf "Tbool %b" x
-      | Tobj _ -> Printf.sprintf "<Tobj>"
-      | Thash _ -> Printf.sprintf "<Thash>"
-      | Tlist x -> Printf.sprintf "Tlist [ %s ]" (String.concat ";" @@ List.map printer x)
-      | Tpat _ -> Printf.sprintf "<Tpat>"
-      | Tset _ -> Printf.sprintf "<Tset>"
-      | Tfun _ -> Printf.sprintf "<Tfun>"
-      | Tnull -> Printf.sprintf "Tnull"
-      | Tarray x -> Printf.sprintf "Tarray [| %s |]" (String.concat ";" @@ List.map printer @@ Array.to_list x)
-      | Tlazy _ -> Printf.sprintf "Tlazy"
-      | Tvolatile _ -> Printf.sprintf "Tvolatile"
-    in
-    func_arg1_no_kw @@ fun x -> Tstr (printer x)
-  in
   let get_person = func_arg1_no_kw @@ function
     | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
     | x -> failwith_type_error_1 "GET_PERSON" x
@@ -1124,12 +1111,11 @@ let sandbox (conf : Config.config) base =
     | x -> failwith_type_error_1 "GET_FAMILY" x
   in
   let () = Random.self_init () in
-  ("DIE", die)
+  ("TWIG", twig)
   :: ("GET_PERSON", get_person)
   :: ("GET_FAMILY", get_family)
   :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
   :: ("DATE", module_date conf)
-  :: ("trans", trans)
   :: ("printf", Jg_types.func_arg1_no_kw Jg_runtime.jg_printf)
   :: default_env conf base
