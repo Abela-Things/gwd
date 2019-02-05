@@ -5,6 +5,8 @@ open Geneweb
 open Jingoo
 open Jg_types
 
+let person_ht = Hashtbl.create 32
+
 let mk_opt fn = function None -> Tnull | Some x -> fn x
 
 let date_compare_aux =
@@ -252,7 +254,11 @@ and lazy_get_n_mk_person conf base i =
   Tpat (function "iper" -> iper | s -> unbox_pat (Lazy.force lp) @@ s)
 
 and get_n_mk_person conf base (i : Adef.iper) =
-  unsafe_mk_person conf base (Util.pget conf base i)
+  try Hashtbl.find person_ht i
+  with Not_found ->
+    let p = unsafe_mk_person conf base (Util.pget conf base i) in
+    Hashtbl.add person_ht i p ;
+    p
 
 and mk_related conf base acc =
   let mk_rel i t s =
