@@ -63,7 +63,7 @@ let rec mk_family (conf : Config.config) base fcd =
     else Tnull
   in
   let children = lazy_array (get_n_mk_person conf base) (E.children fcd) in
-  let marriage_date = mk_opt (mk_date conf) (E.marriage_date fcd) in
+  let marriage_date = mk_opt mk_date (E.marriage_date fcd) in
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
   let marriage_source = get_str (E.marriage_source conf base) in
@@ -120,7 +120,7 @@ and date_compare = func_arg2_no_kw date_compare_aux
 
 and date_eq = func_arg2_no_kw (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
-and mk_date conf d =
+and mk_date d =
   let opt =
     match d with
     | Def.Dtext _ -> fun _ -> Tnull
@@ -141,11 +141,11 @@ and mk_date conf d =
   in
   let d2 = opt (fun d c -> match d.Def.prec with
       | OrYear d2 | YearInt d2 ->
-        mk_date conf (Def.Dgreg ( { Def.day = d2.Def.day2
-                                  ; month = d2.Def.month2
-                                  ; year = d2.Def.year2
-                                  ; prec = Def.Sure ; delta = 0 }
-                                , c) )
+        mk_date (Def.Dgreg ( { Def.day = d2.Def.day2
+                             ; month = d2.Def.month2
+                             ; year = d2.Def.year2
+                             ; prec = Def.Sure ; delta = 0 }
+                           , c) )
       | _ -> Tnull )
   in
   let calendar =
@@ -306,7 +306,7 @@ and mk_witness_kind = function
 
 and mk_event conf base d =
   let module E = Ezgw.Event in
-  let date = match E.date d with Some d -> mk_date conf d | None -> Tnull in
+  let date = match E.date d with Some d -> mk_date d | None -> Tnull in
   let name = Tstr (E.name conf base d) in
   let spouse = match E.spouse_opt d with
     | None -> Tnull
@@ -341,7 +341,7 @@ and mk_event conf base d =
                | "witnesses" -> witnesses
                | _ -> raise Not_found)
 
-and mk_title conf base t =
+and mk_title base t =
   let ident = Tstr (Gwdb.sou base t.Def.t_ident) in
   let name = match t.t_name with
     | Tmain -> Tstr ""
@@ -349,8 +349,8 @@ and mk_title conf base t =
     | Tnone -> Tnull
   in
   let place = Tstr (Gwdb.sou base t.t_place) in
-  let date_start = mk_opt (mk_date conf) (Adef.od_of_cdate t.t_date_start) in
-  let date_end = mk_opt (mk_date conf) (Adef.od_of_cdate t.t_date_start) in
+  let date_start = mk_opt mk_date (Adef.od_of_cdate t.t_date_start) in
+  let date_end = mk_opt mk_date (Adef.od_of_cdate t.t_date_start) in
   let nth = Tint t.t_nth in
   Tpat (function
       | "ident" -> ident
@@ -387,18 +387,18 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let iper' = Gwdb.get_key_index p in
   let access = get_str (E.access conf base) in
   let age = get mk_dmy (E.age conf) in
-  let baptism_date = mk_opt (mk_date conf) (E.baptism_date p) in
+  let baptism_date = mk_opt mk_date (E.baptism_date p) in
   let baptism_place = get_str (E.baptism_place conf base) in
-  let birth_date = mk_opt (mk_date conf) (E.birth_date p) in
+  let birth_date = mk_opt mk_date (E.birth_date p) in
   let birth_place = get_str (E.birth_place conf base) in
-  let burial = get (mk_burial conf) E.burial in
+  let burial = get mk_burial E.burial in
   let burial_place = get_str (E.burial_place conf base) in
   let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
   let consanguinity = get_float (E.consanguinity) in
   let cremation_place = get_str (E.cremation_place conf base) in
   let date = get_str (Date.short_dates_text conf base) in
   let dates = get_str (E.dates conf base) in
-  let death = get (mk_death conf) E.death in
+  let death = get mk_death E.death in
   let death_age = get_str (E.death_age conf) in
   let death_place = get_str (E.death_place conf base) in
   let died = get_str (E.died conf) in
@@ -433,7 +433,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let max_ancestor_level = Tlazy (lazy (get_int (E.max_ancestor_level conf base) ) ) in
   let mother = mk_parent Gwdb.get_mother in
   let nb_families = get_int (E.nb_families conf) in
-  let titles = lazy_list (mk_title conf base) (E.titles p) in
+  let titles = lazy_list (mk_title base) (E.titles p) in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
   let on_baptism_date = get_str (E.on_baptism_date conf) in
@@ -590,17 +590,17 @@ and mk_pevent conf base e =
                | "witnesses" -> Tnull
                | _ -> raise Not_found)
 
-and mk_gen_title conf base t =
+and mk_gen_title base t =
   Tpat (function "t_ident" -> Tstr (Gwdb.sou base t.Def.t_ident)
                | "t_place" -> Tstr (Gwdb.sou base t.t_place)
                | "t_date_start" ->
                  begin match Adef.od_of_cdate t.t_date_start with
-                   | Some d -> mk_date conf d
+                   | Some d -> mk_date d
                    | None -> Tnull
                  end
                | "t_date_end" ->
                  begin match Adef.od_of_cdate t.t_date_end with
-                   | Some d -> mk_date conf d
+                   | Some d -> mk_date d
                    | None -> Tnull
                  end
                | _ -> raise Not_found)
@@ -612,13 +612,13 @@ and mk_death_reason = function
   | Disappeared -> Tstr "Disappeared"
   | Unspecified -> Tstr "Unspecified"
 
-and mk_death conf =
+and mk_death =
   let wrap s = Tpat (function "death_reason" -> Tstr s | _ -> raise Not_found) in
   function
   | Def.NotDead -> Tnull
   | Death (r, cd) ->
     let death_reason = mk_death_reason r in
-    let date = mk_date conf (Adef.date_of_cdate cd) in
+    let date = mk_date (Adef.date_of_cdate cd) in
     Tpat (function "death_reason" -> death_reason
                  | "date" -> date
                  | _ -> raise Not_found)
@@ -627,12 +627,12 @@ and mk_death conf =
   | DontKnowIfDead -> wrap "DontKnowIfDead"
   | OfCourseDead -> wrap "OfCourseDead"
 
-and mk_burial conf = function
+and mk_burial = function
   | Def.UnknownBurial -> Tnull
   | Buried d ->
     let type_ = Tstr "Buried" in
     let date = match Adef.od_of_cdate d with
-      | Some d -> mk_date conf d
+      | Some d -> mk_date d
       | None -> Tnull
     in
     Tpat (function "type" -> type_
@@ -641,7 +641,7 @@ and mk_burial conf = function
   | Cremated d ->
     let type_ = Tstr "Cremated" in
     let date = match Adef.od_of_cdate d with
-      | Some d -> mk_date conf d
+      | Some d -> mk_date d
       | None -> Tnull
     in
     Tpat (function "type" -> type_
@@ -670,7 +670,7 @@ and mk_warning conf base =
     Tset [ Tstr "BigAgeBetweenSpouses"
          ; Tset [ unsafe_mk_person conf base f
                 ; unsafe_mk_person conf base m
-                ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
   | BirthAfterDeath p ->
     Tset [ Tstr "BirthAfterDeath" ; Tset [ unsafe_mk_person conf base p] ]
   | IncoherentSex (p, i1, i2) ->
@@ -733,7 +733,7 @@ and mk_warning conf base =
   | DeadOld (p, a) ->
     Tset [ Tstr "DeadOld"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
   | DeadTooEarlyToBeFather (father, child) ->
     Tset [ Tstr "DeadTooEarlyToBeFather"
          ; Tset [ unsafe_mk_person conf base father
@@ -772,11 +772,11 @@ and mk_warning conf base =
   | ParentTooOld (p, a) ->
     Tset [ Tstr "ParentTooOld"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
   | ParentTooYoung (p, a) ->
     Tset [ Tstr "ParentTooYoung"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
   | PEventOrder (p, e1, e2) ->
     Tset [ Tstr "PEventOrder"
          ; Tset [ unsafe_mk_person conf base p
@@ -793,7 +793,7 @@ and mk_warning conf base =
   | TitleDatesError (p, t) ->
     Tset [ Tstr "PWitnessEventBeforeBirth"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_gen_title conf base t ] ]
+                ; mk_gen_title base t ] ]
   | UndefinedSex p ->
     Tset [ Tstr "UndefinedSex"
          ; Tset [ unsafe_mk_person conf base p ] ]
@@ -806,7 +806,7 @@ and mk_warning conf base =
   | YoungForMarriage (p, a) ->
     Tset [ Tstr "YoungForMarriage"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date conf (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
 
   | PossibleDuplicateFam _ -> assert false (* FIXME *)
 
