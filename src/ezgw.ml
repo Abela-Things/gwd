@@ -428,6 +428,8 @@ module Person = struct
 
   let pnote = notes
 
+  let rparents p = get_rparents p
+
   let related conf base p =
     List.sort
       (fun (c1, _) (c2, _) ->

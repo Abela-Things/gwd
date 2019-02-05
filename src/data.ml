@@ -254,39 +254,31 @@ and lazy_get_n_mk_person conf base i =
 and get_n_mk_person conf base (i : Adef.iper) =
   unsafe_mk_person conf base (Util.pget conf base i)
 
-and mk_relation conf base r =
-  let module E = Ezgw.Relation in
-  let get wrap fn = try wrap (fn r) with Not_found -> Tnull in
-  let has_relation_her = get box_bool E.has_relation_her in
-  let has_relation_him = get box_bool E.has_relation_him in
-  let related = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.related r in
-  let related_type = get box_string (E.related_type conf) in
-  let relation_type = get box_string (E.relation_type conf) in
-  let relation_her = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_her r in
-  let relation_him = get (get_n_mk_person conf base) @@ fun r -> Ezgw.Related.iper @@ E.relation_him r in
-  Tpat (function
-      | "has_relation_her" -> has_relation_her
-      | "has_relation_him" -> has_relation_him
-      | "related" -> related
-      | "related_type" -> related_type
-      | "relation_type" -> relation_type
-      | "relation_her" -> relation_her
-      | "relation_him" -> relation_him
-      | _ -> raise Not_found
-    )
-
-and mk_related conf base r =
-  let module E = Ezgw.Related in
-  let iper_ = E.iper r in
-  let iper = Tint (Adef.int_of_iper iper_) in
-  let person = Tlazy (lazy (get_n_mk_person conf base iper_)) in
-  let type_ = Tstr (E.type_ conf r) in
-  Tpat (function
-      | "type" -> type_
-      | "iper" -> iper
-      | "person" -> person
-      | _ -> raise Not_found
-    )
+and mk_related conf base acc =
+  let mk_rel i t s =
+    let iper = Tint (Adef.int_of_iper i) in
+    let kind = match t with
+      | Def.Adoption -> Tstr "ADOPTION"
+      | Def.Recognition -> Tstr "RECOGNITION"
+      | Def.CandidateParent -> Tstr "CANDIDATEPARENT"
+      | Def.GodParent -> Tstr "GODPARENT"
+      | Def.FosterParent -> Tstr "FOSTERPARENT"
+    in
+    let sources = Tstr (Gwdb.sou base s) in
+    let lp = lazy (get_n_mk_person conf base i) in
+    Tpat (function
+        | "sources" -> sources
+        | "kind" -> kind
+        | "iper" -> iper
+        | s -> unbox_pat (Lazy.force lp) @@ s)
+  in
+  function
+  | { Def.r_fath = None ; r_moth = Some i ; r_type ; r_sources }
+  | { r_fath = Some i ; r_moth = None ; r_type ; r_sources } ->
+    mk_rel i r_type r_sources :: acc
+  | { r_fath = Some i1 ; r_moth = Some i2 ; r_type ; r_sources } ->
+    mk_rel i1 r_type r_sources :: mk_rel i2 r_type r_sources :: acc
+  | _ -> Tnull :: acc
 
 and mk_witness_kind = function
   | Def.Witness -> Tstr "WITNESS"
@@ -438,10 +430,9 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     Tlist (List.map box_string @@ E.qualifiers base p)
   in
   let related =
-    box_lazy @@
-    lazy (box_list @@
-          List.map (fun (a, b) -> mk_relation conf base (b, Some a)) @@ (* FIXME? *)
-          E.related conf base p)
+    match E.rparents p with
+    | [] -> Tlist []
+    | r -> box_list @@ List.fold_left (mk_related conf base) [] r
   in
   let relations = lazy_list (get_n_mk_person conf base) (E.relations p) in
   let sex = get_int E.sex in
