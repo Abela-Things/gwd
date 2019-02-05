@@ -1,8 +1,5 @@
 (* TODO: extract useful conf fields and marshal when possible (espacially translation / date) *)
-
-(* TODO:
-   Do not use on_xxx_date: use dates and use template to display it.
- *)
+(* TODO: remove on_XXX_date and use template for this. *)
 
 open Geneweb
 open Jingoo
@@ -41,17 +38,15 @@ let rec mk_family (conf : Config.config) base fcd =
   let f = E.father fcd in
   let m = E.mother fcd in
   let divorce_date = get_str (E.divorce_date conf) in
-  let father = Tlazy (lazy (get_n_mk_person conf base f) ) in
-  let mother = Tlazy (lazy (get_n_mk_person conf base m) ) in
+  let father = lazy_get_n_mk_person conf base f in
+  let mother = lazy_get_n_mk_person conf base m in
   let spouse =
     let (_, _, (ifath, imoth, ispouse), _) = fcd in
     if ifath = ispouse then father
     else if imoth = ispouse then mother
     else Tnull
   in
-  let children =
-    Tlazy (lazy (Tarray (Array.map (get_n_mk_person conf base) (E.children fcd)) ) )
-  in
+  let children = lazy_array (get_n_mk_person conf base) (E.children fcd) in
   let marriage_date = mk_opt (mk_date conf) (E.marriage_date fcd) in
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
@@ -65,10 +60,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let is_no_mention = get_bool E.is_no_mention in
   let is_no_sexes_check = get_bool E.is_no_sexes_check in
   let ifam = get_int E.ifam in
-  let witnesses = match E.witnesses fcd with
-    | [||] -> Tarray [||]
-    | w -> Tlazy (lazy (box_array @@ Array.map (get_n_mk_person conf base) w))
-  in
+  let witnesses = lazy_array (get_n_mk_person conf base) (E.witnesses fcd) in
   let origin_file = Tlazy (lazy (get_str (E.origin_file conf base))) in
   Tpat (function
       | "are_divorced" -> are_divorced
@@ -216,7 +208,7 @@ and module_date conf =
   let death_symbol = Date.death_symbol conf in
   let string_of_ondate =
     func_arg1_no_kw @@ fun d ->
-    Tlazy (lazy (Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) ) ) )
+    Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) )
   in
   let code_french_year =
     func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
@@ -245,6 +237,19 @@ and module_date conf =
       | "sub" -> func_arg2_no_kw (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
       | _ -> raise Not_found
     )
+
+and lazy_array : 'a . ('a -> tvalue) -> 'a array -> tvalue = fun fn -> function
+  | [||] -> Tarray [||]
+  | a -> Tlazy (lazy (box_array @@ Array.map fn a))
+
+and lazy_list : 'a . ('a -> tvalue) -> 'a list -> tvalue = fun fn -> function
+  | [] -> Tlist []
+  | l -> Tlazy (lazy (box_list @@ List.map fn l))
+
+and lazy_get_n_mk_person conf base i =
+  let lp = lazy (get_n_mk_person conf base i) in
+  let iper = Tint (Adef.int_of_iper i) in
+  Tpat (function "iper" -> iper | s -> unbox_pat (Lazy.force lp) @@ s)
 
 and get_n_mk_person conf base (i : Adef.iper) =
   unsafe_mk_person conf base (Util.pget conf base i)
@@ -291,9 +296,9 @@ and mk_event conf base d =
   let module E = Ezgw.Event in
   let date = match E.date d with Some d -> mk_date conf d | None -> Tnull in
   let name = Tstr (E.name conf base d) in
-  let spouse =
-    Tlazy (lazy (try unsafe_mk_person conf base @@ E.spouse base d
-                 with Not_found -> Tnull))
+  let spouse = match E.spouse_opt d with
+    | None -> Tnull
+    | Some i -> lazy_get_n_mk_person conf base i
   in
   let kind = Tstr (E.kind base d) in
   let witnesses =
@@ -359,15 +364,13 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let get_int = get box_int in
   let get_float = get box_float in
   let module E = Ezgw.Person in
-  let parents =
-    lazy (match E.parents p with
-        | Some ifam -> Some (Gwdb.foi base ifam)
-        | None -> None)
+  let parents = match E.parents p with
+    | Some ifam -> Some (lazy (Gwdb.foi base ifam))
+    | None -> None
   in
-  let mk_parent fn =
-    Tlazy (lazy (match Lazy.force parents with
-        | Some f -> get_n_mk_person conf base (fn f)
-        | None -> Tnull (* fixme *) ) )
+  let mk_parent fn = match parents with
+    | Some f -> Tlazy (lazy (get_n_mk_person conf base (fn @@ Lazy.force f)))
+    | None -> Tnull
   in
   let iper' = Gwdb.get_key_index p in
   let access = get_str (E.access conf base) in
@@ -378,11 +381,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let birth_place = get_str (E.birth_place conf base) in
   let burial = get (mk_burial conf) E.burial in
   let burial_place = get_str (E.burial_place conf base) in
-  let children =
-    box_lazy @@
-    lazy (box_list @@
-          List.map (get_n_mk_person conf base) (E.children base p))
-  in
+  let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
   let consanguinity = get_float (E.consanguinity) in
   let cremation_place = get_str (E.cremation_place conf base) in
   let date = get_str (Date.short_dates_text conf base) in
@@ -392,7 +391,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let death_place = get_str (E.death_place conf base) in
   let died = get_str (E.died conf) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
-  let events = Tlazy (lazy (Tlist (E.events conf base p |> List.map (mk_event conf base)))) in
+  let events = lazy_list (mk_event conf base) (E.events conf base p) in
   let lazy_families = lazy (Array.map (fun ifam -> ifam, Gwdb.foi base ifam) @@ Gwdb.get_family p) in
   let families =
     Tlazy (lazy (Tarray (Array.map (fun (ifam, cpl) -> get_n_mk_family conf base ~origin:iper' ifam cpl) @@
@@ -444,15 +443,9 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
           List.map (fun (a, b) -> mk_relation conf base (b, Some a)) @@ (* FIXME? *)
           E.related conf base p)
   in
-  let relations =
-    match E.relations p with
-    | [] -> Tlist []
-    | r -> box_lazy @@ lazy (box_list @@ List.map (get_n_mk_person conf base) r)
-  in
+  let relations = lazy_list (get_n_mk_person conf base) (E.relations p) in
   let sex = get_int E.sex in
-  let siblings_aux fn =
-    Tlazy (lazy (Tlist (fn base p |> List.map (fun i -> Tlazy (lazy (get_n_mk_person conf base i))))))
-  in
+  let siblings_aux fn = lazy_list (get_n_mk_person conf base) (fn base p) in
   let siblings = siblings_aux E.siblings in
   let half_siblings = siblings_aux E.half_siblings in
   let source_baptism = get_str @@ E.source_baptism base in
@@ -466,10 +459,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_marriage conf base p)
   in
   let source_psources = get_str @@ E.source_psources base in
-  let static_max_ancestor_level =
-    box_lazy @@
-    lazy (get_int ( (E.static_max_ancestor_level conf base) ) )
-  in
   let str__ =
     box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
@@ -478,74 +467,71 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
-  Tlazy (lazy (Tpat
-                 (function
-                   | "access" -> access
-                   | "age" -> age
-                   | "baptism_date" -> baptism_date
-                   | "baptism_place" -> baptism_place
-                   | "birth_date" -> birth_date
-                   | "birth_place" -> birth_place
-                   | "burial" -> burial
-                   | "burial_place" -> burial_place
-                   | "children" -> children
-                   | "cremation_place" -> cremation_place
-                   | "consanguinity" -> consanguinity
-                   | "date" -> date
-                   | "dates" -> dates
-                   | "death" -> death
-                   | "death_age" -> death_age
-                   | "death_place" -> death_place
-                   | "died" -> died
-                   | "digest" -> digest
-                   | "events" -> events
-                   | "families" -> families
-                   | "father" -> father
-                   | "first_name" -> first_name
-                   | "first_name_aliases" -> first_name_aliases
-                   | "first_name_key" -> first_name_key
-                   | "first_name_key_val" -> first_name_key_val
-                   | "half_siblings" -> half_siblings
-                   | "image_url" -> image_url
-                   | "iper" -> iper
-                   | "is_birthday" -> is_birthday
-                   | "linked_page" -> linked_page
-                   | "max_ancestor_level" -> max_ancestor_level
-                   | "mother" -> mother
-                   | "nb_families" -> nb_families
-                   | "occ" -> occ
-                   | "occupation" -> occupation
-                   | "on_baptism_date" -> on_baptism_date
-                   | "on_birth_date" -> on_birth_date
-                   | "on_burial_date" -> on_burial_date
-                   | "on_cremation_date" -> on_cremation_date
-                   | "on_death_date" -> on_death_date
-                   | "public_name" -> public_name
-                   | "qualifier" -> qualifier
-                   | "qualifiers" -> qualifiers
-                   | "relations" -> relations
-                   | "related" -> related
-                   | "sex" -> sex
-                   | "siblings" -> siblings
-                   | "source_baptism" -> source_baptism
-                   | "source_birth" -> source_birth
-                   | "source_burial" -> source_burial
-                   | "source_death" -> source_death
-                   | "source_fsource" -> source_fsource
-                   | "source_marriage" -> source_marriage
-                   | "source_psources" -> source_psources
-                   | "spouses" -> spouses
-                   | "static_max_ancestor_level" -> static_max_ancestor_level
-                   | "surname" -> surname
-                   | "surname_aliases" -> surname_aliases
-                   | "surname_key" -> surname_key
-                   | "surname_key_val" -> surname_key_val
-                   | "titles" -> nobility_titles
-                   | "__str__" -> str__
-                   | _ -> raise Not_found
-                 )
-              )
-        )
+  Tpat
+    (function
+      | "access" -> access
+      | "age" -> age
+      | "baptism_date" -> baptism_date
+      | "baptism_place" -> baptism_place
+      | "birth_date" -> birth_date
+      | "birth_place" -> birth_place
+      | "burial" -> burial
+      | "burial_place" -> burial_place
+      | "children" -> children
+      | "cremation_place" -> cremation_place
+      | "consanguinity" -> consanguinity
+      | "date" -> date
+      | "dates" -> dates
+      | "death" -> death
+      | "death_age" -> death_age
+      | "death_place" -> death_place
+      | "died" -> died
+      | "digest" -> digest
+      | "events" -> events
+      | "families" -> families
+      | "father" -> father
+      | "first_name" -> first_name
+      | "first_name_aliases" -> first_name_aliases
+      | "first_name_key" -> first_name_key
+      | "first_name_key_val" -> first_name_key_val
+      | "half_siblings" -> half_siblings
+      | "image_url" -> image_url
+      | "iper" -> iper
+      | "is_birthday" -> is_birthday
+      | "linked_page" -> linked_page
+      | "max_ancestor_level" -> max_ancestor_level
+      | "mother" -> mother
+      | "nb_families" -> nb_families
+      | "occ" -> occ
+      | "occupation" -> occupation
+      | "on_baptism_date" -> on_baptism_date
+      | "on_birth_date" -> on_birth_date
+      | "on_burial_date" -> on_burial_date
+      | "on_cremation_date" -> on_cremation_date
+      | "on_death_date" -> on_death_date
+      | "public_name" -> public_name
+      | "qualifier" -> qualifier
+      | "qualifiers" -> qualifiers
+      | "relations" -> relations
+      | "related" -> related
+      | "sex" -> sex
+      | "siblings" -> siblings
+      | "source_baptism" -> source_baptism
+      | "source_birth" -> source_birth
+      | "source_burial" -> source_burial
+      | "source_death" -> source_death
+      | "source_fsource" -> source_fsource
+      | "source_marriage" -> source_marriage
+      | "source_psources" -> source_psources
+      | "spouses" -> spouses
+      | "surname" -> surname
+      | "surname_aliases" -> surname_aliases
+      | "surname_key" -> surname_key
+      | "surname_key_val" -> surname_key_val
+      | "titles" -> nobility_titles
+      | "__str__" -> str__
+      | _ -> raise Not_found
+    )
 
 (* FIXME *)
 and mk_source _s =

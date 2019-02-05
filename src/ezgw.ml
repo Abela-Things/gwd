@@ -920,10 +920,8 @@ module Event = struct
   let place conf base (_, _, p, _, _, _, _) =
     Util.string_of_place conf (sou base p)
 
-  let spouse base (_, _, _, _, _, _, isp) =
-    match isp with
-    | Some isp -> poi base isp
-    | None -> raise Not_found
+  let spouse_opt (_, _, _, _, _, _, isp) =
+    isp
 
   let src base (_, _, _, _, s, _, _) =
     sou base s
