@@ -1,0 +1,6 @@
+(executable
+  (name test)
+  (libraries jingoo gwd_lib oUnit)
+)
+
+(alias (name runtest) (action (run ./test.exe) ) )

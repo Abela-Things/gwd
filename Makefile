@@ -5,6 +5,9 @@
 build:
 	dune build src/gwd.exe src/marshaler.exe
 
+test:
+	dune build @runtest
+
 doc:
 	dune build @doc-private
 

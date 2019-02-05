@@ -1,8 +1,15 @@
+(library
+  (name gwd_lib)
+  (wrapped false)
+  (libraries geneweb jingoo)
+  (modules ezgw data)
+)
+
 (executable
   (name gwd)
   (public_name gwd)
-  (libraries geneweb uucp jingoo)
-  (modules ezgw data gwd handler interp)
+  (libraries gwd_lib geneweb jingoo)
+  (modules gwd handler interp)
 )
 
 (executable
