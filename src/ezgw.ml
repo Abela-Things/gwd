@@ -451,7 +451,9 @@ module Person = struct
           list (get_rparents c) )
       [] (List.sort_uniq compare (get_related p))
 
-  let relations p = get_related p
+  (* Why isnt this already unique? *)
+  let relations p =
+    List.sort_uniq compare (get_related p)
 
   let siblings base p =
     match get_parents p with
