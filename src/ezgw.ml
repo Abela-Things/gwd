@@ -376,8 +376,6 @@ module Person = struct
         in
         string_of_int n
 
-  let nobility_titles conf base p = Util.nobtit conf base p
-
   let notes conf base p =
     if not conf.no_note then
       let env = ['i', (fun () -> Util.default_image_name base p)] in
@@ -687,6 +685,9 @@ module Person = struct
 
   let surname_key_strip base p =
     Name.strip_c (p_surname base p) '"'
+
+  let titles p =
+    get_titles p
 
 end
 

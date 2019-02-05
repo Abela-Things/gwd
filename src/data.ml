@@ -419,10 +419,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let max_ancestor_level = Tlazy (lazy (get_int (E.max_ancestor_level conf base) ) ) in
   let mother = mk_parent Gwdb.get_mother in
   let nb_families = get_int (E.nb_families conf) in
-  let nobility_titles =
-    box_lazy @@
-    lazy (box_list @@ List.map (mk_title conf base) @@ E.nobility_titles conf base p)
-  in
+  let titles = lazy_list (mk_title conf base) (E.titles p) in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
   let on_baptism_date = get_str (E.on_baptism_date conf) in
@@ -525,7 +522,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "surname_aliases" -> surname_aliases
       | "surname_key" -> surname_key
       | "surname_key_val" -> surname_key_val
-      | "titles" -> nobility_titles
+      | "titles" -> titles
       | "__str__" -> str__
       | _ -> raise Not_found
     )
