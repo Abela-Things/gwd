@@ -932,9 +932,6 @@ let mk_conf conf base =
 
 let mk_env conf =
   (* FIXME browsing_with_sosa_ref *)
-  let compilation_time = Tstr (Date.string_of_date conf Compilation.compilation_time) in
-  let commit = Tstr Compilation.commit in
-  let commit_date = Tstr (Date.string_of_date conf Compilation.commit_date) in
   let doctype = Tstr (Util.doctype conf) in
   let get = Tpat (fun x -> Tstr (List.assoc x conf.env)) in
   let highlight = Tstr (conf.Config.highlight) in
@@ -965,9 +962,6 @@ let mk_env conf =
   let suffix = wo_henv_senv "" in
   let url = wo_henv_senv (Util.commd conf) in
   Tpat (function
-      | "compilation_time" -> compilation_time
-      | "commit" -> commit
-      | "commit_date" -> commit_date
       | "doctype" -> doctype
       | "get" -> get
       | "highlight" -> highlight
