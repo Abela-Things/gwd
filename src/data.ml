@@ -129,16 +129,7 @@ and mk_date d =
   let year = opt (fun d _ -> Tint d.Def.year) in
   let month = opt (fun d _ -> Tint d.Def.month) in
   let day = opt (fun d _ -> Tint d.Def.day) in
-  let prec = opt (fun d _ -> Tstr (match d.Def.prec with
-      | Def.Sure -> "sure"
-      | About -> "about"
-      | Maybe -> "maybe"
-      | Before -> "before"
-      | After -> "after"
-      | OrYear _ -> "oryear"
-      | YearInt _ -> "yearint")
-    )
-  in
+  let prec = opt (fun d _ -> Tstr (to_prec d.Def.prec)) in
   let d2 = opt (fun d c -> match d.Def.prec with
       | OrYear d2 | YearInt d2 ->
         mk_date (Def.Dgreg ( { Def.day = d2.Def.day2
