@@ -28,7 +28,7 @@ let handler =
         with_person self conf base (fun p ->
             let root = Data.unsafe_mk_person conf base p in
             let models = ("root", root) :: Data.default_env conf base in
-            Interp.render_jingoo ~file:"timeline.html.jingoo" ~models
+            Interp.render ~file:"timeline.html.jingoo.marshaled" ~models
           )
 
       | _ -> self.RequestHandler.incorrect_request self conf base

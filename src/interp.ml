@@ -1,6 +1,7 @@
 open Jingoo
 
 let template_dir = ref ""
+let dev_version = ref false
 
 let mk_env () =
   { Jg_types.autoescape = false
@@ -13,25 +14,18 @@ let mk_env () =
 let open_templ file =
   let file = Filename.concat !template_dir file in
   let ch = open_in_bin @@ file in
-  try
-    let ast : Jg_types.statement list = Marshal.from_channel ch in
-    close_in ch ;
-    ast
-  with _ -> close_in ch ; []
+  let ast : Jg_types.statement list = Marshal.from_channel ch in
+  close_in ch ;
+  ast
 
 let interp_templ ~models ast =
-  Printexc.record_backtrace true ;
-  try
-    let env = mk_env () in
-    let output x = Wserver.printf "%s" @@ Jg_runtime.string_of_tvalue x in
-    let ctx = Jg_interp.init_context ~env ~models ~output () in
-    let ast = Jg_interp.import_macros env ctx ast in
-    ignore @@ List.fold_left (Jg_interp.eval_statement env) ctx ast
-  with e ->
-    Printexc.print_backtrace stdout ;
-    raise e
+  let env = mk_env () in
+  let output x = Wserver.printf "%s" @@ Jg_runtime.string_of_tvalue x in
+  let ctx = Jg_interp.init_context ~env ~models ~output () in
+  let ast = Jg_interp.import_macros env ctx ast in
+  ignore @@ List.fold_left (Jg_interp.eval_statement env) ctx ast
 
-let render ~file ~models =
+let render_compiled ~file ~models =
   interp_templ ~models (open_templ file)
 
 let render_jingoo ~file ~models =
@@ -58,3 +52,8 @@ let render_jingoo ~file ~models =
   with e ->
     Wserver.printf "%s\n\n" @@ Printexc.to_string e ;
     Wserver.printf "%s" @@ Printexc.get_backtrace ()
+
+let render ~file ~models =
+  if !dev_version
+  then render_jingoo ~file:(Filename.chop_suffix file ".marshaled") ~models
+  else render_compiled ~file ~models
