@@ -38,7 +38,8 @@ let test_date_compare _ctx =
   in
   test 0 (dmy 2 7 1988) (dmy 2 7 1988) ;
   test (-1) (dmy 2 7 1988) (dmy 3 7 1988) ;
-  test 1 (dmy 2 7 1988) (dmy 1 7 1988)
+  test 1 (dmy 2 7 1988) (dmy 1 7 1988) ;
+  test 1 (dmy ~prec:After 0 0 1892) (dmy 15 2 1892)
 
 let suite =
   "test_data" >:::
