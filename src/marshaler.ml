@@ -35,7 +35,7 @@ let ls dir filter =
   in
   loop [] [dir]
 
-let compile_dir dir =
+let compile_dir verbose dir =
   let env = { Jg_types.autoescape = false
             ; template_dirs = [ dir ]
             ; filters = []
@@ -43,17 +43,20 @@ let compile_dir dir =
             ; strict_mode = false }
   in
   let files = ls dir (fun f -> Filename.extension f = ".jingoo") in
-  List.iter (marshal true env) files
+  List.iter (marshal verbose env) files
 
 let () =
   let usage =
     "Usage: " ^ Filename.basename Sys.argv.(0) ^ " [options] where options are:"
   in
   let dir = ref "." in
+  let verbose = ref true in
   let speclist =
-    [ ("-dir", Arg.String (fun x -> dir := x), " Set the template dir (default is '.')") ]
+    [ ("--dir", Arg.Set_string dir, " Set the template dir (default is '.')")
+    ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout).")
+    ]
   in
   let anonfun s = raise (Arg.Bad s) in
   Arg.parse speclist anonfun usage ;
   print_endline @@ !dir ;
-  compile_dir !dir
+  compile_dir !verbose !dir
