@@ -1,6 +1,22 @@
+(library
+  (name test_lib)
+  (wrapped false)
+  (libraries geneweb gwd_lib)
+  (modules test_utils)
+)
+
 (executable
   (name test)
-  (libraries jingoo gwd_lib oUnit)
+  (libraries jingoo test_lib gwd_lib oUnit)
+  (modules test test_data)
+)
+
+(executable
+  (name bench)
+  (libraries benchmark test_lib gwd_lib oUnit)
+  (modules bench bench_data)
 )
 
 (alias (name runtest) (action (run ./test.exe) ) )
+
+(alias (name runbench) (action (run ./bench.exe) ) )

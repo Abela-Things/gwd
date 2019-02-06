@@ -8,6 +8,9 @@ build:
 test:
 	dune build @runtest
 
+bench:
+	dune build @runbench
+
 doc:
 	dune build @doc-private
 

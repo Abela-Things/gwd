@@ -5,19 +5,13 @@ open Jg_runtime
 open Geneweb
 open Def
 open Data
+open Test_utils
 
 let field = Jg_runtime.jg_obj_lookup
 
 let assert_equal_tvalue =
   let cmp a b = jg_eq_eq a b = Tbool true in
   assert_equal ~cmp ~printer:Jg_types.show_tvalue
-
-let dmy ?(prec = Sure) day month year =
-  { year ; month ; day ; delta = 0 ; prec }
-
-let dmy2 day2 month2 year2 = { day2 ; month2 ; year2 ; delta2 = 0 }
-
-let date d = mk_date (Dgreg (d, Dgregorian) )
 
 let test_mk_date _ctx =
   let rec test ({ year ; month ; day ; prec ; _ } as d) =
