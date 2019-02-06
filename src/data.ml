@@ -13,35 +13,34 @@ let rec date_compare_aux date1 date2 =
   let y1 = field date1 "year" in
   let y2 = field date2 "year" in
   match Jg_runtime.jg_compare y1 y2 with
-  | Tint 0 -> begin match field date1 "month", field date2 "month" with
-      | Tint 0, _ | _, Tint 0 -> cmp_prec date1 date2
-      | m1, m2 -> match Jg_runtime.jg_compare m1 m2 with
-        | Tint 0 -> begin match field date1 "day", field date2 "day" with
-            | Tint 0, _ | _, Tint 0 -> cmp_prec date1 date2
-            | d1, d2 -> match Jg_runtime.jg_compare d1 d2 with
-              | Tint 0 -> cmp_prec date1 date2
-              | c -> c
-          end
-        | c -> c
-    end
-  | c -> c
+  | Tint 0 -> compare_month date1 date2
+  | x -> x
+and compare_month date1 date2 = match field date1 "month", field date2 "month" with
+  | Tint 0, Tint 0 -> cmp_prec date1 date2
+  | Tint 0, Tint _ ->
+    if field date1 "prec" = Tstr "after" then Tint 1 else cmp_prec date1 date2
+  | Tint _, Tint 0 ->
+    if field date2 "prec" = Tstr "after" then Tint (-1) else cmp_prec date1 date2
+  | m1, m2 -> match Jg_runtime.jg_compare m1 m2 with
+    | Tint 0 -> compare_day date1 date2
+    | x -> x
+and compare_day date1 date2 = match field date1 "day", field date2 "day" with
+  | Tint 0, Tint 0 -> cmp_prec date1 date2
+  | Tint 0, Tint _ ->
+    if field date1 "prec" = Tstr "after" then Tint 1 else cmp_prec date1 date2
+  | Tint _, Tint 0 ->
+    if field date2 "prec" = Tstr "after" then Tint (-1) else cmp_prec date1 date2
+  | d1, d2 -> match Jg_runtime.jg_compare d1 d2 with
+    | Tint 0 -> cmp_prec date1 date2
+    | x -> x
 and cmp_prec d1 d2 =
   match field d1 "prec", field d2 "prec" with
-  | (Tstr "sure", Tstr "sure")
-  | (Tstr "about", Tstr "about")
-  | (Tstr "maybe", Tstr "maybe")
-  | (Tstr "before", Tstr "before")
-  | (Tstr "after", Tstr "after") ->
-    Tint 0
-  | (Tstr "oryear", Tstr "oryear")
-  | (Tstr "yearint", Tstr "yearint") ->
+  | Tstr ("sure"|"about"|"maybe"), Tstr ("sure"|"about"|"maybe") -> Tint 0
+  | Tstr "after", Tstr "after" | Tstr "before", Tstr "before" -> Tint 0
+  | Tstr "oryear", Tstr "oryear" | Tstr "yearint", Tstr "yearint" ->
     date_compare_aux (field d1 "d2") (field d2 "d2")
-  | (Tstr ("sure"|"about"|"maybe"|"before"), Tstr "after")
-  | (Tstr "before", Tstr ("sure"|"about"|"maybe") ) ->
-    Tint (-1)
-  | (Tstr "after", Tstr ("sure"|"about"|"maybe"|"before") )
-  | (Tstr ("sure"|"about"|"maybe"), Tstr "before") ->
-    Tint 1
+  | _, Tstr "after" | Tstr "before", _ -> Tint (-1)
+  | Tstr "after", _ | _, Tstr "before" -> Tint 1
   | _ -> Tint 0
 and field = Jg_runtime.jg_obj_lookup
 
