@@ -1,6 +1,11 @@
 open Jingoo
 open Jg_types
 
+let optimize_ast env ast =
+  Jg_interp.unfold_extends env ast
+  |> Jg_interp.inline_include env
+  |> Jg_interp.replace_blocks
+
 let marshal verbose env file =
   if verbose then print_endline @@ "Marshaling: " ^ file ;
   let file_in = file in
@@ -14,9 +19,7 @@ let marshal verbose env file =
     try Jg_parser.input Jg_lexer.main lexbuf
     with e -> raise @@ SyntaxError (Jg_utils.get_parser_error e lexbuf)
   in
-  let ast = Jg_interp.unfold_extends env ast in
-  let ast = Jg_interp.inline_include env ast in
-  let ast = Jg_interp.replace_blocks ast in
+  let ast = optimize_ast env ast in
   Marshal.to_channel ch_out ast [] ;
   close_in ch_in ;
   close_out ch_out
