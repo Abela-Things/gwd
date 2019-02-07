@@ -3,7 +3,7 @@ open Jg_types
 
 let optimize_ast env ast =
   Jg_interp.unfold_extends env ast
-  |> Jg_interp.inline_include env
+  |> Jg_ast_optimize.inline_include env
   |> Jg_interp.replace_blocks
   |> Jg_ast_optimize.dead_code_elimination
 

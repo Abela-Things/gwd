@@ -43,7 +43,7 @@ let render_jingoo ~file ~models =
     close_in ch_in ;
     let env = mk_env () in
     let ast = Jg_interp.unfold_extends env ast in
-    let ast = Jg_interp.inline_include env ast in
+    let ast = Jg_ast_optimize.inline_include env ast in
     let ast = Jg_interp.replace_blocks ast in
     let output x = Wserver.printf "%s" @@ Jg_runtime.string_of_tvalue x in
     let ctx = Jg_interp.init_context ~env ~models ~output () in
