@@ -5,6 +5,7 @@ let optimize_ast env ast =
   Jg_interp.unfold_extends env ast
   |> Jg_interp.inline_include env
   |> Jg_interp.replace_blocks
+  |> Jg_ast_optimize.dead_code_elimination
 
 let marshal verbose env file =
   if verbose then print_endline @@ "Marshaling: " ^ file ;
