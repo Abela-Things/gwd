@@ -40,10 +40,40 @@ let test_date_compare _ctx =
   test __LOC__ 1 (dmy 2 7 1988) (dmy 1 7 1988) ;
   test __LOC__ 1 (dmy ~prec:After 0 0 1892) (dmy 15 2 1892) ;
   test __LOC__ 1 (dmy ~prec:After 0 0 1892) (dmy ~prec:After 15 2 1892) ;
-  test __LOC__ 1 (dmy ~prec:After 0 0 1892) (dmy ~prec:After 15 2 1892)
+  test __LOC__ 1 (dmy ~prec:After 0 0 1892) (dmy ~prec:After 15 2 1892) ;
+  test __LOC__ 0 (dmy 5 6 1996) (dmy 0 0 1996)
+
+let test_date_compare_list _ctx =
+  assert_equal
+    [ (dmy 0 0 1990), 0
+    ; (dmy ~prec:Before 0 0 1995), 1
+    ; (dmy 1 6 1995), 2
+    ; (dmy ~prec:After 0 0 1995), 3
+    ; (dmy 5 4 1996), 4
+    ; (dmy 0 0 1996), 5
+    ; (dmy 5 6 1996), 6
+    ; (dmy 0 0 1996), 7
+    ; (dmy 0 0 1996), 8
+    ; (dmy 0 0 1997), 9
+    ]
+    (let compare (a ,_) (b ,_) = unbox_int (date_compare_aux (date a) (date b)) in
+     List.stable_sort compare
+       [ (dmy ~prec:After 0 0 1995), 3
+       ; (dmy 1 6 1995), 2
+       ; (dmy 5 4 1996), 4
+       ; (dmy 0 0 1996), 5
+       ; (dmy 0 0 1997), 9
+       ; (dmy 5 6 1996), 6
+       ; (dmy 0 0 1990), 0
+       ; (dmy 0 0 1996), 7
+       ; (dmy ~prec:Before 0 0 1995), 1
+       ; (dmy 0 0 1996), 8
+       ]
+    )
 
 let suite =
   "test_data" >:::
   [ "test_mk_date" >:: test_mk_date
   ; "test_date_compare" >:: test_date_compare
+  ; "test_date_compare_list" >:: test_date_compare_list
   ]
