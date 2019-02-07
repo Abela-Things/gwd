@@ -1004,12 +1004,23 @@ let translate conf (* base *) =
     | Tstr s, Tstr s' -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
     | _ -> failwith_type_error_2 "ftransl" x y
   in
+  let i18n =
+    func_arg1_no_kw @@ function
+    | Tstr arg ->
+      let len = String.length arg in
+      let ri = String.rindex arg ']' in
+      let c = if ri = len - 1 then "" else String.sub arg (ri + 1) (len - ri - 1) in
+      let s = String.sub arg 1 (len - 1 - (len - ri)) in
+      Tstr (Templ.eval_transl conf false s c)
+    | x -> failwith_type_error_1 "i18n" x
+  in
   Tpat (function "decline" -> decline
                | "nth" -> nth
                | "transl" -> transl
                | "transl_a_of_b" -> transl_a_of_b
                | "transl_a_of_gr_eq_gen_lev" -> transl_a_of_gr_eq_gen_lev
                | "ftransl" -> ftransl
+               | "i18n" -> i18n
                | x -> failwith x)
 
 let decode_varenv =
