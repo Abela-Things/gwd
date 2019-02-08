@@ -1,8 +1,20 @@
+(ocamllex i18n)
+(executable (name i18n) (modules i18n))
+
+(rule
+  (targets trans.ml)
+  (deps i18n.exe)
+  (action (run %{deps}
+  /home/jsagot/workspace/geneanet.git/geneweb/gw_new/gw/lang/lex_utf8.txt,/home/jsagot/workspace/geneanet.git/geneweb/gw_new/gw/lang/geneanet_utf8.txt
+ %{targets})
+  )
+)
+
 (library
   (name gwd_lib)
   (wrapped false)
   (libraries geneweb jingoo)
-  (modules ezgw data)
+  (modules ezgw data trans)
 )
 
 (executable
@@ -17,7 +29,6 @@
   (libraries uucp jingoo)
   (modules marshaler)
 )
-
 
 ; Dummy library used to generate doc
 (library

@@ -975,54 +975,6 @@ let mk_env conf =
       | _ -> raise Not_found
     )
 
-(* TODO: remove base *)
-let translate conf (* base *) =
-  let decline = func_arg2_no_kw @@ fun s1 s2 ->
-    try Tstr (Util.transl_decline conf (unbox_string s1) (unbox_string s2))
-    with _ -> failwith_type_error_2 "translate" s1 s2
-  in
-  let nth = func_arg2_no_kw @@ fun a1 a2 ->  match a1, a2 with
-    | Tstr s, Tint i -> Tstr (Util.transl_nth conf s i)
-    | Tstr s, Tstr i -> Tstr (Util.transl_nth conf s @@ int_of_string i)
-    | _ -> failwith_type_error_2 "nth" a1 a2
-  in
-  let transl_a_of_b = func_arg2_no_kw @@ fun x y ->
-    try Tstr (Util.transl_a_of_b conf (unbox_string x) (unbox_string y) (unbox_string y))
-    with _ -> failwith_type_error_2 "a_of_b" x y
-  in
-  let transl_a_of_gr_eq_gen_lev = func_arg2_no_kw @@ fun x y ->
-    try Tstr (Util.transl_a_of_gr_eq_gen_lev conf (unbox_string x) (unbox_string y) (unbox_string y))
-    with _ -> failwith_type_error_2 "a_of_gr_eq_gen_lev" x y
-  in
-  let transl = func_arg1_no_kw @@ fun x ->
-    try Tstr (Util.transl conf (unbox_string x))
-    with _ -> failwith_type_error_1 "transl" x
-  in
-  let ftransl = func_arg2_no_kw @@ fun x y ->
-    match x, y with
-    | Tstr s, Tint i -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%d") i)
-    | Tstr s, Tstr s' -> Tstr (Printf.sprintf (Scanf.format_from_string (Util.transl conf s) "%s") s')
-    | _ -> failwith_type_error_2 "ftransl" x y
-  in
-  let i18n =
-    func_arg1_no_kw @@ function
-    | Tstr arg ->
-      let len = String.length arg in
-      let ri = String.rindex arg ']' in
-      let c = if ri = len - 1 then "" else String.sub arg (ri + 1) (len - ri - 1) in
-      let s = String.sub arg 1 (len - 1 - (len - ri)) in
-      Tstr (Templ.eval_transl conf false s c)
-    | x -> failwith_type_error_1 "i18n" x
-  in
-  Tpat (function "decline" -> decline
-               | "nth" -> nth
-               | "transl" -> transl
-               | "transl_a_of_b" -> transl_a_of_b
-               | "transl_a_of_gr_eq_gen_lev" -> transl_a_of_gr_eq_gen_lev
-               | "ftransl" -> ftransl
-               | "i18n" -> i18n
-               | x -> failwith x)
-
 let decode_varenv =
   func_arg1_no_kw @@ fun str ->
   try Tstr (Wserver.decode @@ unbox_string str)
@@ -1063,6 +1015,24 @@ let twigify filter =
 
 let twig = Tpat (fun s -> twigify s)
 
+let trans conf =
+  let fn = match conf.Config.lang with
+    | "de" -> Trans.de
+    | "en" -> Trans.en
+    | "es" -> Trans.es
+    | "fi" -> Trans.fi
+    | "fr" -> Trans.fr
+    | "it" -> Trans.it
+    | "nl" -> Trans.nl
+    | "no" -> Trans.no
+    | "pt" -> Trans.pt
+    | "sv" -> Trans.sv
+    | _ -> raise Not_found
+  in
+  Tfun (fun ?kwargs s ->
+      try fn ?kwargs s
+      with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1081,10 +1051,10 @@ let default_env conf base (* p *) =
   (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
   :: ("code_varenv", code_varenv)
-  :: ("translate", translate conf)
   :: ("base", mk_base base)
   :: ("conf", conf_env)
   :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
+  :: ("trans", trans conf)
   :: []
 
 let sandbox (conf : Config.config) base =
