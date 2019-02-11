@@ -1029,9 +1029,15 @@ let trans conf =
     | "sv" -> Trans.sv
     | _ -> raise Not_found
   in
-  Tfun (fun ?kwargs s ->
-      try fn ?kwargs s
-      with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
+  Tfun (fun ?(kwargs=[]) -> function
+      | Tint x ->
+        Tfun
+          (fun ?kwargs:_ s ->
+             try fn x kwargs s
+             with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
+      | s ->
+        try fn 0 kwargs s
+        with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in

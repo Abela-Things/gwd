@@ -44,28 +44,45 @@ and p_lang acc = parse
       if List.mem lang langs then
         let trad = String.split_on_char '/' trad in
         let trad =
-          List.map (fun t -> p_trad 1 (Buffer.create 42) [] @@ Lexing.from_string t) trad
+          List.map (fun t -> p_trad (Buffer.create 42) [] @@ Lexing.from_string t) trad
         in
         p_lang ((lang, trad) :: acc) lexbuf
       else p_lang acc lexbuf
     }
   | "" { acc }
 
-and p_trad cnt buffer acc = parse
+and p_trad buffer acc = parse
   | '%' (num+ as n) {
       let acc = flush buffer acc in
-      p_trad cnt buffer (Arg ("_" ^ n) :: acc) lexbuf
+      p_trad buffer (Arg ("_" ^ n) :: acc) lexbuf
     }
-  | '%' lower+ {
+  | '%' (lower+ as n) {
       let acc = flush buffer acc in
-      p_trad (cnt + 1) buffer (Arg ("_" ^ string_of_int cnt)  :: acc) lexbuf
+      p_trad buffer (Arg n :: acc) lexbuf
     }
   | _ as c {
       Buffer.add_char buffer c ;
-      p_trad cnt buffer acc lexbuf
+      p_trad buffer acc lexbuf
     }
   | eof {
-      List.rev (flush buffer acc)
+      let base s =
+        let rec loop i =
+          if i = 0 then ""
+          else if s.[i] >= '0' && s.[i] <= '9' then loop (i - 1)
+          else String.sub s 0 (i + 1)
+        in loop (String.length s - 1)
+      in
+      let occ s list = List.fold_left (fun sum -> function Arg x when base x = s -> sum + 1 | _ -> sum) 1 list in
+      let rec loop acc = function
+        | Arg hd :: tl ->
+          let occ = occ hd tl in
+          if occ = 1 && not (List.exists (function Arg s -> base s = hd | _ -> false) acc)
+          then loop (Arg hd :: acc) tl
+          else loop (Arg (hd ^ string_of_int occ) :: acc) tl
+        | hd :: tl -> loop (hd :: acc) tl
+        | [] -> acc
+      in
+      loop [] (flush buffer acc)
     }
 
 {
@@ -94,6 +111,14 @@ let print_list fmt format sep printer =
        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt sep)
        printer)
 
+let print_list_i fmt format sep printer =
+  let i = ref 0 in
+  Format.fprintf fmt format
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> incr i ; Format.pp_print_string fmt sep)
+       (fun fmt x -> printer fmt !i x) )
+
+
 let print_part fmt =
   function
   | Str s -> Format.fprintf fmt "\"%s\"" s
@@ -111,19 +136,17 @@ let args line =
 let find_lang lang tr =
   try List.assoc lang tr with Not_found -> List.assoc default_lang tr
 
-let print_lang fmt key lang tr =
+let print_lang fmt i lang tr =
   let line = find_lang lang tr in
   let args = args line in
-  Format.fprintf fmt "let _%s_%s %s=\n" (to_ocaml_var_name key) lang
-    (if args <> [] || List.length line > 1 then "kwargs " else "") ;
+  Format.fprintf fmt "let _%s_%i%s%s =\n" lang i
+    (if List.length line > 1 then " nth" else "")
+    (if args <> [] then " kwargs" else "") ;
   if args <> [] then
     print_list fmt "%a\n" "\n"
       (fun fmt x ->
          Format.fprintf fmt "let %s = List.assoc \"%s\" kwargs in" x x)
       args ;
-  if List.length line > 1 then
-    Format.pp_print_string fmt
-      "let nth = try unbox_int @@ List.assoc \"nth\" kwargs with Not_found -> 0 in\n" ;
   print_list fmt (if List.length line > 1 then "Tstr ([|%a|].(nth))\n" else "Tstr (%a)\n") ";"
     (fun fmt -> function
        | [ x ] -> print_part fmt x
@@ -131,20 +154,21 @@ let print_lang fmt key lang tr =
     line
 
 let print_ocaml output key_value =
-  print_list output "%a" "\n"
-    (fun fmt (key, tr) ->
+  print_list_i output "%a" "\n"
+    (fun fmt i (_key, tr) ->
        print_list fmt "%a" "\n"
-         (fun fmt lang -> print_lang fmt key lang tr)
+         (fun fmt lang -> print_lang fmt i lang tr)
          langs)
     key_value ;
   print_list output "%a" "\n"
     (fun fmt lang ->
-       Format.fprintf fmt "let %s =\nfun ?(kwargs=[]) x -> unbox_string x |> function\n" lang ;
-       print_list fmt "%a" "\n"
-         (fun fmt (key, tr) ->
-            Format.fprintf fmt "| \"%s\" -> _%s_%s%s" (String.escaped key) (to_ocaml_var_name key) lang
-              (let line = find_lang lang tr in
-               if args line <> [] || List.length line > 1 then " kwargs" else "") )
+       Format.fprintf fmt "let %s =\nfun nth kwargs x -> unbox_string x |> function\n" lang ;
+       print_list_i fmt "%a" "\n"
+         (fun fmt i (key, tr) ->
+            let line = find_lang lang tr in
+            Format.fprintf fmt "| \"%s\" -> _%s_%i%s%s" (String.escaped key) lang i
+              (if List.length line > 1 then " nth" else "")
+              (if args line <> [] then " kwargs" else "") )
          key_value ;
        Format.pp_print_string output "\n| _ -> raise Not_found\n"
     ) langs
