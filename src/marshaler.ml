@@ -26,7 +26,7 @@ let inline_const stmts =
     | e -> default_mapper.expression self e
   in
   let mapper = { default_mapper with statement ; expression } in
-  let rec loop ast = if !flag then (flag := false ; loop (mapper.ast mapper stmts)) else ast in
+  let rec loop ast = if !flag then (flag := false ; loop (mapper.ast mapper ast)) else ast in
   loop stmts
 
 let preapply stmts =
