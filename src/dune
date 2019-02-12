@@ -26,7 +26,7 @@
 
 (executable
   (name marshaler)
-  (libraries uucp jingoo)
+  (libraries uucp jingoo gwd_lib)
   (modules marshaler)
 )
 

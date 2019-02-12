@@ -55,7 +55,7 @@ let handler =
   ; b = restricted_friend begin fun _self conf base ->
       let data = birth_death_aux conf base (fun p -> Adef.od_of_cdate (get_birth p)) false in
       let models = ("data", Tlist data) :: Data.default_env conf base in
-      Interp.render ~file:"b.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"b" ~models
     end
 
   ; chg_chn = restricted_wizard begin fun self conf base ->
@@ -68,7 +68,7 @@ let handler =
             :: ("ind", Data.get_n_mk_person conf base ip)
             :: Data.default_env conf base
           in
-          Interp.render ~file:"chg_chn.html.jingoo.marshaled" ~models
+          Interp.render ~conf ~file:"chg_chn" ~models
         | _ -> self.incorrect_request self conf base
     end
 
@@ -97,7 +97,7 @@ let handler =
               with ChangeChildren.FirstNameMissing _ip ->
                 ("error", Tbool true) :: Data.default_env conf base
             in
-            Interp.render ~file:"chg_chn_ok.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"chg_chn_ok" ~models
         with Update.ModErr -> () (* FIXME? *)
     end
 
@@ -110,7 +110,7 @@ let handler =
           :: ("num_aboville", Tbool (Util.p_getenv conf.env "num" = Some "on"))
           :: Data.default_env conf base
         in
-        Interp.render ~file:"d_aboville.html.jingoo.marshaled" ~models
+        Interp.render ~conf ~file:"d_aboville" ~models
       | _ -> RequestHandler.defaultHandler.d self conf base
     end
 
@@ -121,7 +121,7 @@ let handler =
           ("data", Data.get_n_mk_person conf base (Adef.iper_of_int i))
           :: Data.default_env conf base
         in
-        Interp.render ~file:"del_ind.html.jingoo.marshaled" ~models
+        Interp.render ~conf ~file:"del_ind" ~models
       | _ -> self.incorrect_request self conf base
     end
 
@@ -148,7 +148,7 @@ let handler =
         let changed = Def.U_Delete_person op in
         History.record conf base changed "dp";
         let models = Data.default_env conf base in
-        Interp.render ~file:"del_ind_ok.html.jingoo.marshaled" ~models
+        Interp.render ~conf ~file:"del_ind_ok" ~models
       | _ -> self.incorrect_request self conf base
     end
 
@@ -179,7 +179,7 @@ let handler =
         ("data", Tlist data)
         :: Data.default_env conf base
       in
-      Interp.render ~file:"ll.html.jingoo" ~models
+      Interp.render ~conf ~file:"ll.html.jingoo" ~models
     end
 
   ; lm = restricted_friend begin fun _self conf base ->
@@ -191,7 +191,7 @@ let handler =
       in
       let data = birth_death_aux_fam conf base get_date false in
       let models = ("data", Tlist data) :: Data.default_env conf base in
-      Interp.render ~file:"lm.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"lm" ~models
     end
 
   ; mrg = restricted_wizard begin fun self conf base ->
@@ -211,7 +211,7 @@ let handler =
         :: ("ind", Data.get_n_mk_person conf base this_key_index)
         :: Data.default_env conf base
       in
-      Interp.render ~file:"mrg.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"mrg" ~models
     end
 
   ; mrg_ind = restricted_wizard begin fun _self conf base ->
@@ -256,7 +256,7 @@ let handler =
               :: ( "string_of_burial", Tfun (fun ?kwargs:_ _ -> Tnull))
               :: env
             in
-            Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"mrg_ind" ~models
           in
           try
             let (ok, wl) = Geneweb.MergeInd.merge conf base p1 p2 propose_merge_ind in
@@ -268,19 +268,19 @@ let handler =
                                       | _ -> raise Not_found ) )
                 :: env
               in
-              Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models
+              Interp.render ~conf ~file:"mrg_ind" ~models
           with
           | Geneweb.MergeInd.Same_person ->
             let models = ("error", Tpat (function "same_person" -> Tbool true | _ -> raise Not_found) ) :: env in
-            Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"mrg_ind" ~models
           | Geneweb.MergeInd.Different_sexes ->
             let models = ( "error", Tpat (function "different_sexes" -> Tbool true | _ -> raise Not_found) ) :: env  in
-            Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"mrg_ind" ~models
           | Geneweb.MergeInd.Error_loop p ->
             let models = ( "error", Data.unsafe_mk_person conf base p ) :: env  in
-            Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"mrg_ind" ~models
         with Not_found ->
-          Interp.render ~file:"mrg_ind.html.jingoo.marshaled" ~models:( ("error", Tbool true) :: Data.default_env conf base )
+          Interp.render ~conf ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
       end
 
   ; oa = restricted_friend @@ begin fun _self conf base ->
@@ -296,7 +296,7 @@ let handler =
       in
       let data = birth_death_aux conf base get_oldest_alive true in
       let models = ("data", Tlist data) :: Data.default_env conf base in
-      Interp.render ~file:"oa.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"oa" ~models
     end
 
   ; oe = begin restricted_friend @@ fun _self conf base ->
@@ -312,7 +312,7 @@ let handler =
       in
       let data = birth_death_aux_fam conf base get_date true in
       let models = ("data", Tlist data) :: Data.default_env conf base in
-      Interp.render ~file:"oe.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"oe" ~models
     end
 
   ; pop_pyr = begin fun _self conf base ->
@@ -334,7 +334,7 @@ let handler =
         :: ("wom", Tarray (Array.map box_int wom))
         :: Data.default_env conf base
       in
-      Interp.render ~file:"pop_pyr.html.jingoo.marshaled" ~models
+      Interp.render ~conf ~file:"pop_pyr" ~models
     end
 
   ; fallback = begin fun mode -> fun self conf base ->
@@ -351,7 +351,7 @@ let handler =
         with_person self conf base (fun p ->
             let root = Data.unsafe_mk_person conf base p in
             let models = ("root", root) :: Data.default_env conf base in
-            Interp.render ~file:"timeline.html.jingoo.marshaled" ~models
+            Interp.render ~conf ~file:"timeline" ~models
           )
 
       | _ -> self.RequestHandler.incorrect_request self conf base

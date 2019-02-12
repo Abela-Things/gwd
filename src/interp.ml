@@ -12,7 +12,9 @@ let mk_env () =
   }
 
 let open_templ file =
-  let file = Filename.concat !template_dir file in
+  print_endline @@ __LOC__ ^ " " ^ file ;
+  let file = !template_dir ^ Filename.dir_sep ^ file in
+  print_endline @@ __LOC__ ^ " " ^ file ;
   let ch = open_in_bin @@ file in
   let ast : Jg_types.statement list = Marshal.from_channel ch in
   close_in ch ;
@@ -53,7 +55,8 @@ let render_jingoo ~file ~models =
     Wserver.printf "%s\n\n" @@ Printexc.to_string e ;
     Wserver.printf "%s" @@ Printexc.get_backtrace ()
 
-let render ~file ~models =
+let render ~conf ~file ~models =
+  print_endline @@ file ^ ".html.jingoo." ^ conf.Geneweb.Config.lang ;
   if !dev_version
-  then render_jingoo ~file:(Filename.chop_suffix file ".marshaled") ~models
-  else render_compiled ~file ~models
+  then render_jingoo ~file:(file ^ ".html.jingoo") ~models
+  else render_compiled ~file:(file ^ ".html.jingoo." ^ conf.Geneweb.Config.lang) ~models

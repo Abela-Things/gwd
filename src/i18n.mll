@@ -162,7 +162,7 @@ let print_ocaml output key_value =
     key_value ;
   print_list output "%a" "\n"
     (fun fmt lang ->
-       Format.fprintf fmt "let %s =\nfun nth kwargs x -> unbox_string x |> function\n" lang ;
+       Format.fprintf fmt "let %s =\nfun nth kwargs -> function\n" lang ;
        print_list_i fmt "%a" "\n"
          (fun fmt i (key, tr) ->
             let line = find_lang lang tr in

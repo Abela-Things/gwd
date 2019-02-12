@@ -1033,11 +1033,13 @@ let trans conf =
       | Tint x ->
         Tfun
           (fun ?kwargs:_ s ->
+             let s = unbox_string s in
              try fn x kwargs s
-             with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
+             with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify s))
       | s ->
+        let s = unbox_string s in
         try fn 0 kwargs s
-        with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ unbox_string s))
+        with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify s))
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
