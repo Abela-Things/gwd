@@ -59,19 +59,17 @@ let preapply stmts =
       let s = default_mapper.statement self s in
       pop_block () ;
       s
-    | FunctionStatement (IdentExpr id, args, _)
-    | MacroStatement (IdentExpr id, args, _) as s ->
+    | FunctionStatement (id, args, _)
+    | MacroStatement (id, args, _) as s ->
       push_block id ;
       set_local id ;
       List.iter (fun (i, _) -> set_local i) args ;
       let s = default_mapper.statement self s in
       pop_block () ;
       s
-    | CallStatement(macro, _, _, _) as s ->
-      maybe_set macro ;
+    | CallStatement(id, _, _, _) as s ->
+      set_local id ;
       default_mapper.statement self s
-    | FunctionStatement (_, _, _)
-    | MacroStatement (_, _, _)
     | TextStatement (_)
     | ExpandStatement (_)
     | IfStatement (_)
