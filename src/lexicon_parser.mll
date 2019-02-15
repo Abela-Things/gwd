@@ -31,9 +31,9 @@ rule p_main acc = parse
 
 and p_lang acc = parse
   | ((lower | '-' )+ as lang) ':' ' '? (line as trad) eol {
-      let trad = String.split_on_char '/' trad in
+      let trad = Array.of_list @@ String.split_on_char '/' trad in
       let trad =
-        List.map (fun t -> p_trad (Buffer.create 42) [] @@ Lexing.from_string t) trad
+        Array.map (fun t -> p_trad (Buffer.create 42) [] @@ Lexing.from_string t) trad
       in
       p_lang ((lang, trad) :: acc) lexbuf
     }
@@ -71,4 +71,5 @@ and p_trad buffer acc = parse
         | [] -> acc
       in
       loop [] (flush buffer acc)
+      |> Array.of_list
     }

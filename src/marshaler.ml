@@ -10,6 +10,11 @@ let kwargs_args =
   in
   loop [] []
 
+let is_std_filter n =
+  Array.exists (fun (n', _) -> n' = n) Jg_runtime.std_filters
+
+let inline_const_cnt = ref 0
+
 let inline_const stmts =
   let flag = ref true in
   let open Jg_ast_mapper in
@@ -22,38 +27,94 @@ let inline_const stmts =
     | s -> default_mapper.statement self s
   in
   let expression self = function
-    | IdentExpr i when Hashtbl.mem ht i -> LiteralExpr (Hashtbl.find ht i)
+    | IdentExpr i when Hashtbl.mem ht i -> incr inline_const_cnt ; LiteralExpr (Hashtbl.find ht i)
     | e -> default_mapper.expression self e
   in
   let mapper = { default_mapper with statement ; expression } in
   let rec loop ast = if !flag then (flag := false ; loop (mapper.ast mapper ast)) else ast in
   loop stmts
 
+let preapply_cnt = ref 0
+
 let preapply stmts =
+  let open Jg_ast_mapper in
+  let local_variables : (string * string list) list ref = ref [("", [])] in
+  let push_block name = local_variables := (name, []) :: !local_variables in
+  let pop_block () = local_variables := List.tl !local_variables in
+  let set_local x =
+    let fst, snd = List.hd !local_variables in
+    local_variables := (fst, x :: snd ) :: (List.tl !local_variables) in
+  let is_local (x : string) = List.exists (fun (_, l) -> List.mem x l) !local_variables in
+  let rec maybe_set = function
+    | SetExpr set -> List.iter maybe_set set
+    | IdentExpr id -> set_local id
+    | _ -> () in
+  let statement self = function
+    | SetStatement (id, _) as s ->
+      maybe_set id ;
+      default_mapper.statement self s
+    | ForStatement (id, _, _) as s ->
+      push_block "" ;
+      List.iter set_local id ;
+      let s = default_mapper.statement self s in
+      pop_block () ;
+      s
+    | FunctionStatement (IdentExpr id, args, _)
+    | MacroStatement (IdentExpr id, args, _) as s ->
+      push_block id ;
+      set_local id ;
+      List.iter (fun (i, _) -> set_local i) args ;
+      let s = default_mapper.statement self s in
+      pop_block () ;
+      s
+    | CallStatement(macro, _, _, _) as s ->
+      maybe_set macro ;
+      default_mapper.statement self s
+    | FunctionStatement (_, _, _)
+    | MacroStatement (_, _, _)
+    | TextStatement (_)
+    | ExpandStatement (_)
+    | IfStatement (_)
+    | SwitchStatement (_, _)
+    | IncludeStatement (_, _)
+    | RawIncludeStatement _
+    | ExtendsStatement _
+    | ImportStatement (_, _)
+    | FromImportStatement (_, _)
+    | BlockStatement (_, _)
+    | FilterStatement (_, _)
+    | WithStatement (_, _)
+    | AutoEscapeStatement (_, _)
+    | NamespaceStatement (_, _)
+    | Statements (_)
+      as s -> default_mapper.statement self s
+  in
   let expression self = function
     | ApplyExpr (IdentExpr n , args) as e
       when List.for_all (function (_, LiteralExpr _) -> true | _ -> false) args
-        && Array.exists (fun (n', _) -> n' = n) Jg_runtime.std_filters
-      ->
+        && (not @@ is_local n) && is_std_filter n ->
       let kwargs, args = kwargs_args args in
       let rec loop i =
         let (n', fn) = Array.get Jg_runtime.std_filters i in
         if n = n'
         then match Jg_runtime.jg_apply ~kwargs fn args with
           | Tfun _ -> Jg_ast_mapper.default_mapper.expression self e
-          | x -> LiteralExpr x
+          | x -> incr preapply_cnt ; LiteralExpr x
         else loop (i + 1)
       in loop 0
     | e -> Jg_ast_mapper.default_mapper.expression self e
   in
-  let mapper = { Jg_ast_mapper.default_mapper with expression } in
+  let mapper = { Jg_ast_mapper.default_mapper with statement ; expression } in
   mapper.ast mapper stmts
+
+let concat_cnt = ref 0
 
 (* TODO: detect string concatenation *)
 let concat stmts =
   let flush str acc =
     if str = [] then acc
     else
+      let () = concat_cnt := !concat_cnt + List.length str in
       let s = String.concat "" (List.rev str) in
       let s = Str.global_replace (Str.regexp "[\n ]+") " " s in
       TextStatement s :: acc
@@ -86,41 +147,59 @@ let concat stmts =
   in
   loop [] [] stmts
 
+let clean_cnt = ref 0
+
 let clean stmts =
   let rec loop acc = function
     | [] -> List.rev acc
-    | Statements [] :: tl -> loop acc tl
+    | Statements [] :: tl -> incr clean_cnt ; loop acc tl
     | hd :: tl -> loop (hd :: acc) tl
   in
   loop [] stmts
 
-let inline_trans fn stmts =
+let inline_trans_cnt = ref 0
+
+let inline_trans ht stmts =
   let open Jg_ast_mapper in
+  let stringify s =
+    Printf.sprintf (if String.contains s '\'' then "\"%s\"" else "'%s'") s
+  in
+  let fn ~kwargs s i =
+    incr inline_trans_cnt ;
+    LiteralExpr begin
+      try (Hashtbl.find ht s) ?kwargs:(Some kwargs) i
+      with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify s)
+    end
+  in
   let expression self = function
     | ApplyExpr (IdentExpr "trans", args) as e ->
-      begin
-        try
+      begin try
           let kwargs, args = kwargs_args args in
           match args with
-          | [ Tint i ; Tstr s ] ->
-            LiteralExpr (fn i kwargs s)
-          | [ Tstr s ] ->
-            let e =
-              try (fn 0 kwargs s)
-              with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ Data.stringify s)
-            in
-            LiteralExpr e
-          | _ ->
-            default_mapper.expression self e
-        with
-        | Not_found -> default_mapper.expression self e
+          | [ Tint i ; Tstr s ] -> fn ~kwargs s i
+          | [ Tstr s ] -> fn ~kwargs s 0
+          | _ -> default_mapper.expression self e
+        with Not_found -> default_mapper.expression self e
       end
     | e -> default_mapper.expression self e
   in
   let mapper = { default_mapper with expression } in
   mapper.ast mapper stmts
 
+let is_std_filter n =
+  if is_std_filter n then (print_endline n ; assert false) else false
+
+let rec expr_is_std_filter = function
+  | IdentExpr n -> is_std_filter n
+  | ListExpr e | SetExpr e -> List.exists expr_is_std_filter e
+  | _ -> false
+
 let marshal verbose env file =
+  inline_const_cnt := 0 ;
+  inline_trans_cnt := 0 ;
+  preapply_cnt := 0 ;
+  concat_cnt := 0 ;
+  clean_cnt := 0 ;
   if verbose then print_string @@ "Marshaling " ^ file ^ ":" ;
   let file_in = file in
   let ch_in = open_in file_in in
@@ -140,6 +219,9 @@ let marshal verbose env file =
     |> inline_const
     |> Jg_ast_optimize.dead_code_elimination
   in
+  let de, en, es, fi, fr, it, nl, no, pt, sv =
+    Lazy.force Trans.de_en_es_fi_fr_it_nl_no_pt_sv
+  in
   List.iter
     (fun (lang, trans) ->
        let ast =
@@ -154,18 +236,27 @@ let marshal verbose env file =
        Marshal.to_channel ch_out ast [] ;
        if verbose then print_string @@ " " ^ lang ;
        close_out ch_out)
-    [ ( "de", Trans.de)
-    ; ( "en", Trans.en)
-    ; ( "es", Trans.es)
-    ; ( "fi", Trans.fi)
-    ; ( "fr", Trans.fr)
-    ; ( "it", Trans.it)
-    ; ( "nl", Trans.nl)
-    ; ( "no", Trans.no)
-    ; ( "pt", Trans.pt)
-    ; ( "sv", Trans.sv)
+    [ ( "de", de)
+    ; ( "en", en)
+    ; ( "es", es)
+    ; ( "fi", fi)
+    ; ( "fr", fr)
+    ; ( "it", it)
+    ; ( "nl", nl)
+    ; ( "no", no)
+    ; ( "pt", pt)
+    ; ( "sv", sv)
     ] ;
-  if verbose then print_endline " DONE!"
+  if verbose then begin
+    print_endline " DONE!" ;
+    print_endline @@ Printf.sprintf
+      "inline_const: %d / inline_trans: %d / preapply: %d / concat: %d / clean: %d"
+      !inline_const_cnt
+      !inline_trans_cnt
+      !preapply_cnt
+      !concat_cnt
+      !clean_cnt
+  end
 
 let ls dir filter =
   List.filter filter @@
@@ -192,20 +283,26 @@ let compile_dir verbose ext dir =
   List.iter (marshal verbose env) files
 
 let () =
-  let usage =
-    "Usage: " ^ Filename.basename Sys.argv.(0) ^ " [options] where options are:"
-  in
-  let dir = ref "." in
-  let verbose = ref true in
-  let ext = ref ".html.jingoo" in
-  let speclist =
-    [ ("--dir", Arg.Set_string dir, " Set the template dir (default is '.')")
-    ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout)")
-    ; ( "--file-extension", Arg.Set_string ext
-      , " Filter on file extension (default is .html.jingoo)")
-    ]
-  in
-  let anonfun s = raise (Arg.Bad s) in
-  Arg.parse speclist anonfun usage ;
-  print_endline @@ !dir ;
-  compile_dir !verbose !ext !dir
+  Printexc.record_backtrace true ;
+  try
+    let usage =
+      "Usage: " ^ Filename.basename Sys.argv.(0) ^ " [options] where options are:"
+    in
+    let dir = ref "." in
+    let verbose = ref true in
+    let ext = ref ".html.jingoo" in
+    let speclist =
+      [ ("--dir", Arg.Set_string dir, " Set the template dir (default is '.')")
+      ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout)")
+      ; ( "--file-extension", Arg.Set_string ext
+        , " Filter on file extension (default is .html.jingoo)")
+      ; ("--lexicon", Arg.String (fun s -> Trans.lexicon_files := String.split_on_char ',' s)
+        , " Files to use in order to inline translations (separated by comma)")
+      ]
+    in
+    let anonfun s = raise (Arg.Bad s) in
+    Arg.parse speclist anonfun usage ;
+    print_endline @@ !dir ;
+    compile_dir !verbose !ext !dir
+  with _ -> Printexc.print_backtrace stdout
+

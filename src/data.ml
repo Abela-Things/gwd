@@ -1,4 +1,3 @@
-(* TODO: extract useful conf fields and marshal when possible (espacially translation / date) *)
 (* TODO: remove on_XXX_date and use template for this. *)
 
 open Geneweb
@@ -1016,30 +1015,24 @@ let twigify filter =
 let twig = Tpat (fun s -> twigify s)
 
 let trans conf =
-  let fn = match conf.Config.lang with
-    | "de" -> Trans.de
-    | "en" -> Trans.en
-    | "es" -> Trans.es
-    | "fi" -> Trans.fi
-    | "fr" -> Trans.fr
-    | "it" -> Trans.it
-    | "nl" -> Trans.nl
-    | "no" -> Trans.no
-    | "pt" -> Trans.pt
-    | "sv" -> Trans.sv
-    | _ -> raise Not_found
+  let trad ~kwargs s i =
+    let s =
+      if kwargs = [] then s
+      else s ^ ":::" ^ String.concat ":" (List.map fst kwargs)
+    in
+    let s = Templ.eval_transl conf false s i in
+    if s <> "" && String.get s 0 = '[' && String.get s (String.length s - 1) = ']'
+    then Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify @@ String.sub s 1 (String.length s - 2))
+    else Tstr s
   in
-  Tfun (fun ?(kwargs=[]) -> function
-      | Tint x ->
-        Tfun
-          (fun ?kwargs:_ s ->
-             let s = unbox_string s in
-             try fn x kwargs s
-             with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify s))
-      | s ->
-        let s = unbox_string s in
-        try fn 0 kwargs s
-        with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify s))
+  Tfun begin fun ?(kwargs=[]) -> function
+    | Tint i ->
+      Tfun begin fun ?kwargs:_ s ->
+        trad ~kwargs (unbox_string s) (string_of_int i)
+      end
+    | Tstr s -> trad ~kwargs s ""
+    | x -> Jingoo.Jg_types.failwith_type_error_1 "trans" x
+  end
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
