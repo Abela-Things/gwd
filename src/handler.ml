@@ -179,7 +179,7 @@ let handler =
         ("data", Tlist data)
         :: Data.default_env conf base
       in
-      Interp.render ~conf ~file:"ll.html.jingoo" ~models
+      Interp.render ~conf ~file:"ll" ~models
     end
 
   ; lm = restricted_friend begin fun _self conf base ->
