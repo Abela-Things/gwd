@@ -1018,7 +1018,9 @@ let trans conf =
   let trad ~kwargs s i =
     let s =
       if kwargs = [] then s
-      else s ^ ":::" ^ String.concat ":" (List.map fst kwargs)
+      else
+        let args = List.map (fun (_, x) -> Jg_runtime.string_of_tvalue x) kwargs in
+        s ^ ":::" ^ String.concat ":" args
     in
     let s = Templ.eval_transl conf false s i in
     if s <> "" && String.get s 0 = '[' && String.get s (String.length s - 1) = ']'
