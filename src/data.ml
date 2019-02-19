@@ -1036,6 +1036,14 @@ let trans conf =
     | x -> Jingoo.Jg_types.failwith_type_error_1 "trans" x
   end
 
+let trans_a_of_b conf =
+  func_arg2 begin fun ?(kwargs=[]) a b ->
+    let a = unbox_string a in
+    let b = unbox_string b in
+    let elision = try unbox_string @@ List.assoc "elision" kwargs with Not_found -> b in
+    Tstr (Util.transl_a_of_gr_eq_gen_lev conf a b elision)
+  end
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1058,6 +1066,7 @@ let default_env conf base (* p *) =
   :: ("conf", conf_env)
   :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
   :: ("trans", trans conf)
+  :: ("trans_a_of_b", trans_a_of_b conf)
   :: []
 
 let sandbox (conf : Config.config) base =
