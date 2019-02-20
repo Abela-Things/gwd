@@ -802,6 +802,18 @@ and mk_warning conf base =
 
   | PossibleDuplicateFam _ -> assert false (* FIXME *)
 
+let module_OPT =
+  let map = func_arg2_no_kw begin fun fn -> let fn = unbox_fun fn in function
+      | Tnull -> Tnull
+      | x -> fn x
+    end
+  in
+  Tpat begin function
+    | "map" -> map
+    | _ -> raise Not_found
+  end
+
+
 let mk_conf conf base =
   let _commd_no_params = Tnull in (* FIXME *)
   let link_to_referer = Tstr (Hutil.link_to_referer conf) in (* TO BE REMOVED? *)
@@ -1047,6 +1059,10 @@ let trans_a_of_b conf =
     Tstr (Util.transl_a_of_gr_eq_gen_lev conf a b elision)
   end
 
+let get_person conf base = func_arg1_no_kw @@ function
+  | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
+  | x -> failwith_type_error_1 "GET_PERSON" x
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1058,8 +1074,11 @@ let default_env conf base (* p *) =
    *     | _ -> assert false)
    * in *)
   let evar = mk_evar conf in
-  ("TWIG", twig)
+   ("trans", trans conf)
+  :: ("trans_a_of_b", trans_a_of_b conf)
   :: ("DATE", module_date conf)
+  :: ("OPT", module_OPT)
+  :: ("GET_PERSON", get_person conf base)
   :: ("env", mk_env conf)
   :: ("evar", evar)
   (* :: ("initCache", initCache) *)
@@ -1067,16 +1086,10 @@ let default_env conf base (* p *) =
   :: ("code_varenv", code_varenv)
   :: ("base", mk_base base)
   :: ("conf", conf_env)
-  :: ("log", Tfun (fun ?kwargs:_ x -> Printf.eprintf "log: %s\n" @@ Jg_runtime.string_of_tvalue x ; Tnull))
-  :: ("trans", trans conf)
-  :: ("trans_a_of_b", trans_a_of_b conf)
+  :: ("TWIG", twig)
   :: []
 
 let sandbox (conf : Config.config) base =
-  let get_person = func_arg1_no_kw @@ function
-    | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
-    | x -> failwith_type_error_1 "GET_PERSON" x
-  in
   let get_family = func_arg1_no_kw @@ function
     | Tint i ->
       let ifam = Adef.ifam_of_int i in
@@ -1086,10 +1099,10 @@ let sandbox (conf : Config.config) base =
   in
   let () = Random.self_init () in
   ("TWIG", twig)
-  :: ("GET_PERSON", get_person)
+  :: ("GET_PERSON", get_person conf base)
   :: ("GET_FAMILY", get_family)
   :: ("RANDOM_IPER", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_persons base))))
   :: ("RANDOM_IFAM", Tvolatile (fun () -> Tint (Random.int (Gwdb.nb_of_families base))))
   :: ("DATE", module_date conf)
-  :: ("printf", Jg_types.func_arg1_no_kw Jg_runtime.jg_printf)
+  :: ("OPT", module_OPT)
   :: default_env conf base
