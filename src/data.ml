@@ -74,7 +74,10 @@ let rec mk_family (conf : Config.config) base fcd =
   let is_no_mention = get_bool E.is_no_mention in
   let is_no_sexes_check = get_bool E.is_no_sexes_check in
   let ifam = get_int E.ifam in
-  let witnesses = lazy_array (get_n_mk_person conf base) (E.witnesses fcd) in
+  let witnesses =
+    try lazy_array (get_n_mk_person conf base) (E.witnesses fcd)
+    with Not_found -> Tnull
+  in
   let origin_file = Tlazy (lazy (get_str (E.origin_file conf base))) in
   Tpat (function
       | "are_divorced" -> are_divorced
