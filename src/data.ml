@@ -224,17 +224,25 @@ and module_date conf =
   let string_of_age =
     func_arg1_no_kw (fun d -> box_string @@ Date.string_of_age conf (to_dmy d) )
   in
+  let sub =
+    func_arg2_no_kw begin fun d1 d2 ->
+      mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1)
+    end
+  in
+  let calendar =
+    func_arg2_no_kw begin fun dst d ->
+      (* let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "calendar" in *)
+      let convert fn = mk_dmy @@ fn @@ to_dmy (* @@ to_gregorian_aux src *) d in
+      match unbox_string @@ dst with
+      | "Dgregorian" -> convert (fun x -> x)
+      | "Djulian" -> convert Calendar.julian_of_gregorian
+      | "Dfrench" -> convert Calendar.french_of_gregorian
+      | "Dhebrew" -> convert Calendar.hebrew_of_gregorian
+      | s -> failwith @@ "Unknown calendar: " ^ s
+    end
+  in
   Tpat (function
-      | "calendar" -> func_arg2_no_kw (fun dst d ->
-          (* let src = unbox_string @@ Jg_runtime.jg_obj_lookup d "calendar" in *)
-          let convert fn = mk_dmy @@ fn @@ to_dmy (* @@ to_gregorian_aux src *) d in
-          match unbox_string @@ dst with
-          | "Dgregorian" -> convert (fun x -> x)
-          | "Djulian" -> convert Calendar.julian_of_gregorian
-          | "Dfrench" -> convert Calendar.french_of_gregorian
-          | "Dhebrew" -> convert Calendar.hebrew_of_gregorian
-          | s -> failwith @@ "Unknown calendar: " ^ s
-        )
+      | "calendar" -> calendar
       | "compare" -> date_compare
       | "death_symbol" -> Tstr death_symbol
       | "code_french_year" -> code_french_year
@@ -242,7 +250,7 @@ and module_date conf =
       | "now" -> now
       | "string_of_age" -> string_of_age
       | "string_of_ondate" -> string_of_ondate
-      | "sub" -> func_arg2_no_kw (fun d1 d2 -> mk_dmy @@ CheckItem.time_elapsed (to_dmy d2) (to_dmy d1))
+      | "sub" -> sub
       | _ -> raise Not_found
     )
 
