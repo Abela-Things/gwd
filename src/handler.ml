@@ -118,7 +118,7 @@ let handler =
       match Util.p_getint conf.env "i" with
       | Some i ->
         let models =
-          ("data", Data.get_n_mk_person conf base (Adef.iper_of_int i))
+          ("ind", Data.get_n_mk_person conf base (Adef.iper_of_int i))
           :: Data.default_env conf base
         in
         Interp.render ~conf ~file:"del_ind" ~models
