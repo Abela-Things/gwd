@@ -14,9 +14,17 @@
   (modules gwd handler interp)
 )
 
+
+(library
+  (name marshaler_lib)
+  (wrapped false)
+  (libraries jingoo gwd_lib)
+  (modules marshaler_lib)
+)
+
 (executable
   (name marshaler)
-  (libraries uucp jingoo gwd_lib)
+  (libraries uucp jingoo gwd_lib marshaler_lib)
   (modules marshaler)
 )
 

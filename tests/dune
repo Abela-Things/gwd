@@ -7,8 +7,8 @@
 
 (executable
   (name test)
-  (libraries jingoo test_lib gwd_lib oUnit)
-  (modules test test_data)
+  (libraries jingoo test_lib gwd_lib marshaler_lib oUnit)
+  (modules test test_data test_marshaler)
 )
 
 (executable
