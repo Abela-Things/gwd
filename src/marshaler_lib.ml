@@ -67,9 +67,12 @@ let preapply stmts =
       let s = default_mapper.statement self s in
       pop_block () ;
       s
-    | CallStatement(id, _, _, _) as s ->
-      set_local id ;
-      default_mapper.statement self s
+    | CallStatement(_, args, _, _) as s ->
+      push_block "" ;
+      List.iter (fun (i, _) -> set_local i) args ;
+      let s = default_mapper.statement self s in
+      pop_block () ;
+      s
     | TextStatement (_)
     | ExpandStatement (_)
     | IfStatement (_)
