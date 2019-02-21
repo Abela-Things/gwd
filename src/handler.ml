@@ -136,7 +136,8 @@ let handler =
         let old_related = get_related p in
         let op = Util.string_gen_person base (gen_person_of_person p) in
         UpdateIndOk.update_relations_of_related base ip old_related;
-        let warning _ = () in     (* TODO!!! *)
+        let warnings = ref [] in
+        let warning w = warnings := w :: !warnings in
         let p = UpdateIndOk.effective_del base warning p in
         Gwdb.patch_person base ip p;
         if fn <> "?" && sn <> "?" then
@@ -147,7 +148,10 @@ let handler =
         Util.commit_patches conf base;
         let changed = Def.U_Delete_person op in
         History.record conf base changed "dp";
-        let models = Data.default_env conf base in
+        let models =
+          ("warnings", Tlist (List.map (Data.mk_warning conf base) !warnings))
+          :: Data.default_env conf base
+        in
         Interp.render ~conf ~file:"del_ind_ok" ~models
       | _ -> self.incorrect_request self conf base
     end
