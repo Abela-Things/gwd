@@ -5,7 +5,7 @@ type i18n_expr =
   | Str of string
 
 let flush buffer acc =
-  let acc = match String.escaped (Buffer.contents buffer) with
+  let acc = match Buffer.contents buffer with
     | "" -> acc
     | x -> Str x :: acc in
   Buffer.clear buffer ;
