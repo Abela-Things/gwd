@@ -120,6 +120,9 @@ let concat stmts =
     | [] -> List.rev (flush str acc)
     | ExpandStatement (LiteralExpr (Tstr s)) :: tl
     | TextStatement s :: tl -> loop (s :: str) acc tl
+    | Statements stmts :: tl ->
+      cont str acc tl @@
+      Statements (loop [] [] stmts)
     | IfStatement br :: tl ->
       cont str acc tl @@
       IfStatement (List.map (fun (e, stmts) -> e, loop [] [] stmts) br)
@@ -129,9 +132,6 @@ let concat stmts =
     | MacroStatement (exp, args, stmts) :: tl ->
       cont str acc tl @@
       MacroStatement (exp, args, loop [] [] stmts)
-    | Statements stmts :: tl ->
-      cont str acc tl @@
-      Statements (loop [] [] stmts)
     | BlockStatement (e, stmts) :: tl ->
       cont str acc tl @@
       BlockStatement (e, loop [] [] stmts)
@@ -144,12 +144,14 @@ let concat stmts =
   in
   loop [] [] stmts
 
-let clean_cnt = ref 0
+let flatten_cnt = ref 0
 
-let clean stmts =
+let flatten stmts =
   let rec loop acc = function
     | [] -> List.rev acc
-    | Statements [] :: tl -> incr clean_cnt ; loop acc tl
+    | Statements stmts :: tl ->
+      incr flatten_cnt ;
+      loop (List.rev_append (loop [] stmts) acc) tl
     | hd :: tl -> loop (hd :: acc) tl
   in
   loop [] stmts

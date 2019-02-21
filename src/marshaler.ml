@@ -7,7 +7,7 @@ let marshal verbose env file =
   inline_trans_cnt := 0 ;
   preapply_cnt := 0 ;
   concat_cnt := 0 ;
-  clean_cnt := 0 ;
+  flatten_cnt := 0 ;
   if verbose then print_string @@ "Marshaling " ^ file ^ ":" ;
   let file_in = file in
   let ch_in = open_in file_in in
@@ -36,8 +36,8 @@ let marshal verbose env file =
          (* Other optimizations *)
          inline_trans trans ast
          |> preapply
+         |> flatten
          |> concat
-         |> clean
        in
        let file_out = file ^ "." ^ lang in
        let ch_out = open_out_bin file_out in
@@ -58,12 +58,12 @@ let marshal verbose env file =
   if verbose then begin
     print_endline " DONE!" ;
     print_endline @@ Printf.sprintf
-      "inline_const: %d / inline_trans: %d / preapply: %d / concat: %d / clean: %d"
+      "inline_const: %d / inline_trans: %d / preapply: %d / concat: %d / flatten: %d"
       !inline_const_cnt
       !inline_trans_cnt
       !preapply_cnt
       !concat_cnt
-      !clean_cnt
+      !flatten_cnt
   end
 
 let ls dir filter =
