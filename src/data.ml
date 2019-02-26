@@ -320,7 +320,7 @@ and mk_event conf base d =
   in
   let place = Tstr (E.place conf base d) in
   let src = Tstr (E.src base d) in
-  let note = Tstr (E.note base d) in
+  let note = Tstr (E.note conf base d) in
   Tpat (function "date" -> date
                | "kind" -> kind
                | "name" -> name

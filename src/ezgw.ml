@@ -1003,8 +1003,8 @@ module Event = struct
     | Geneweb.Perso.Pevent name -> Util.string_of_pevent_name conf base name
     | Fevent name -> Util.string_of_fevent_name conf base name
 
-  let note base (_, _, _, n, _, _, _) =
-    sou base n
+  let note conf base (_, _, _, n, _, _, _) =
+    if conf.no_note then "" else sou base n
 
   let witnesses (_, _, _, _, _, w, _) =
     w
