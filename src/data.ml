@@ -987,11 +987,11 @@ let translate conf (* base *) =
     | _ -> failwith_type_error_2 "nth" a1 a2
   in
   let transl_a_of_b = func_arg2_no_kw @@ fun x y ->
-    try Tstr (Util.transl_a_of_b conf (unbox_string x) (unbox_string y))
+    try Tstr (Util.transl_a_of_b conf (unbox_string x) (unbox_string y) (unbox_string y))
     with _ -> failwith_type_error_2 "a_of_b" x y
   in
   let transl_a_of_gr_eq_gen_lev = func_arg2_no_kw @@ fun x y ->
-    try Tstr (Util.transl_a_of_gr_eq_gen_lev conf (unbox_string x) (unbox_string y))
+    try Tstr (Util.transl_a_of_gr_eq_gen_lev conf (unbox_string x) (unbox_string y) (unbox_string y))
     with _ -> failwith_type_error_2 "a_of_gr_eq_gen_lev" x y
   in
   let transl = func_arg1_no_kw @@ fun x ->
