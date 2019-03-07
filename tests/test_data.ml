@@ -71,9 +71,19 @@ let test_date_compare_list _ctx =
        ]
     )
 
+let test_json_encode _ctx =
+  let str =
+    {|Un évènement avec des "quotes" ou des 'single-quote', des \" et des \'|}
+  in
+  let expected =
+    {|"Un évènement avec des \"quotes\" ou des 'single-quote', des \\\" et des \\'"|}
+  in
+  assert_equal_tvalue (Tstr expected) (Tstr (json_encode @@ Tstr str))
+
 let suite =
   "test_data" >:::
   [ "test_mk_date" >:: test_mk_date
   ; "test_date_compare" >:: test_date_compare
   ; "test_date_compare_list" >:: test_date_compare_list
+  ; "test_json_encode" >:: test_json_encode
   ]
