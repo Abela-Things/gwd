@@ -281,7 +281,8 @@ let handler =
             let models = ( "error", Tpat (function "different_sexes" -> Tbool true | _ -> raise Not_found) ) :: env  in
             Interp.render ~conf ~file:"mrg_ind" ~models
           | Geneweb.MergeInd.Error_loop p ->
-            let models = ( "error", Data.unsafe_mk_person conf base p ) :: env  in
+            let ind = Data.unsafe_mk_person conf base p in
+            let models = ( "error", Tpat (function "own_ancestor" -> ind | _ -> raise Not_found) ) :: env  in
             Interp.render ~conf ~file:"mrg_ind" ~models
         with Not_found ->
           Interp.render ~conf ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
