@@ -274,7 +274,7 @@ and pget conf base ip =
   let open Gwdb in
   let dummy_iper = Adef.iper_of_int (-1) in
   if ip = dummy_iper
-  then unsafe_mk_person conf base @@ Gwdb.empty_person base ip
+  then Tpat (fun _ -> Tnull)
   else
     let p = poi base ip in
     if not (Util.authorized_age conf base p)
