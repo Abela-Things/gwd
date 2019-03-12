@@ -112,8 +112,8 @@ and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
                    else origin)
   in
   let m_auth =
-    Util.authorized_age conf base (Util.pget conf base ifath)
-    && Util.authorized_age conf base (Util.pget conf base imoth)
+    Util.authorized_age conf base (Gwdb.poi base ifath)
+    && Util.authorized_age conf base (Gwdb.poi base imoth)
   in
   mk_family conf base (ifam, Gwdb.foi base ifam, cpl, m_auth)
 
@@ -267,10 +267,37 @@ and lazy_get_n_mk_person conf base i =
   let iper = Tint (Adef.int_of_iper i) in
   Tpat (function "iper" -> iper | s -> unbox_pat (Lazy.force lp) @@ s)
 
+and pget conf base ip =
+  let open Geneweb in
+  let open Config in
+  let open Def in
+  let open Gwdb in
+  let dummy_iper = Adef.iper_of_int (-1) in
+  if ip = dummy_iper
+  then unsafe_mk_person conf base @@ Gwdb.empty_person base ip
+  else
+    let p = poi base ip in
+    if not (Util.authorized_age conf base p)
+    then
+      if conf.use_restrict
+      then Tpat (fun _ -> Tnull)
+      else if conf.hide_names || get_access p = Private
+      then
+        let lazy_p = lazy (unbox_pat @@ unsafe_mk_semi_public_person conf base p) in
+        Tpat begin function
+          | "first_name"
+          | "first_name_aliases"
+          | "surname"
+          | "surname_aliases" -> Tnull
+          | x -> (Lazy.force lazy_p) x
+        end
+      else unsafe_mk_semi_public_person conf base p
+    else unsafe_mk_person conf base p
+
 and get_n_mk_person conf base (i : Adef.iper) =
   try Hashtbl.find person_ht i
   with Not_found ->
-    let p = unsafe_mk_person conf base (Util.pget conf base i) in
+    let p = pget conf base i in
     Hashtbl.add person_ht i p ;
     p
 
@@ -361,15 +388,70 @@ and mk_title base t =
       | "nth" -> nth
       | _ -> raise Not_found)
 
+and unsafe_mk_semi_public_person conf base (p : Gwdb.person) =
+  let iper' = Gwdb.get_key_index p in
+  let get wrap fn = try wrap (fn p) with Not_found -> Tnull in
+  let get_str = get box_string in
+  let module E = Ezgw.Person in
+  let parents = match E.parents p with
+    | Some ifam -> Some (lazy (Gwdb.foi base ifam))
+    | None -> None
+  in
+  let mk_parent fn = match parents with
+    | Some f -> Tlazy (lazy (get_n_mk_person conf base (fn @@ Lazy.force f)))
+    | None -> Tnull
+  in
+  let lazy_families = lazy (Array.map (fun ifam -> ifam, Gwdb.foi base ifam) @@ Gwdb.get_family p) in
+  let families =
+    Tlazy (lazy (Tarray (Array.map (fun (ifam, cpl) -> get_n_mk_family conf base ~origin:iper' ifam cpl) @@
+                         Lazy.force lazy_families) ) )
+  in
+  let spouses =
+    Tlazy (lazy (Tarray (Array.map (fun (_, c) ->
+        let f = Gwdb.get_father c in
+        get_n_mk_person conf base (if f = iper' then Gwdb.get_mother c else f) )
+        (Lazy.force lazy_families) ) ) )
+  in
+  let father = mk_parent Gwdb.get_father in
+  let first_name = get_str (E.first_name base) in
+  let first_name_aliases =
+    box_list @@
+    List.map box_string (E.first_name_aliases base p)
+  in
+  let access = get_str (E.access conf base) in
+  let mother = mk_parent Gwdb.get_mother in
+  let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
+  let iper = Tint (Adef.int_of_iper iper') in
+  let related =
+    match E.rparents p with
+    | [] -> Tlist []
+    | r -> box_list @@ List.fold_left (mk_related conf base) [] r
+  in
+  let siblings_aux fn = lazy_list (get_n_mk_person conf base) (fn base p) in
+  let siblings = siblings_aux E.siblings in
+  let half_siblings = siblings_aux E.half_siblings in
+  let surname = get_str (E.surname base) in
+  let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
+  Tpat
+    (function
+      | "access" -> access
+      | "children" -> children
+      | "families" -> families
+      | "father" -> father
+      | "first_name" -> first_name
+      | "first_name_aliases" -> first_name_aliases
+      | "half_siblings" -> half_siblings
+      | "iper" -> iper
+      | "mother" -> mother
+      | "related" -> related
+      | "siblings" -> siblings
+      | "spouses" -> spouses
+      | "surname" -> surname
+      | "surname_aliases" -> surname_aliases
+      | _ -> raise Not_found
+    )
+
 and unsafe_mk_person conf base (p : Gwdb.person) =
-  (* match Perso_link.get_father_link conf.command (get_key_index a) with
-   * | Some fath ->
-   *   let ep = Perso_link.make_ep_link base fath in
-   *   let conf = {conf with command = fath.MLink.Person.baseprefix} in
-   *   let env = ("p_link", Vbool true) :: env in
-   *   eval_person_field_var conf base env ep loc sl
-   * | None ->
-   *   warning_use_has_parents_before_parent loc "father" (str_val "") *)
   let get wrap fn = try wrap (fn p) with Not_found -> Tnull in
   let get_str = get box_string in
   let get_bool = get box_bool in
