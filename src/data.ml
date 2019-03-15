@@ -478,7 +478,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
   let consanguinity = get_float (E.consanguinity) in
   let cremation_place = get_str (E.cremation_place conf base) in
-  let date = get_str (Date.short_dates_text conf base) in
   let dates = get_str (E.dates conf base) in
   let death = get mk_death E.death in
   let death_age = get_str (E.death_age conf) in
@@ -570,7 +569,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "children" -> children
       | "cremation_place" -> cremation_place
       | "consanguinity" -> consanguinity
-      | "date" -> date
       | "dates" -> dates
       | "death" -> death
       | "death_age" -> death_age
