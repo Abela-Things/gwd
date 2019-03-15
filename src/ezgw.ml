@@ -468,16 +468,20 @@ module Person = struct
     | Some ifam ->
       let ip = get_key_index p in
       let f = foi base ifam in
-      let fath = poi base @@ get_father f in
-      let moth = poi base @@ get_mother f in
       let filter = fun (acc : iper list) i ->
         if i = ifam then acc else
           Array.fold_right
             (fun i acc -> if i <> ip then i :: acc else acc)
             (get_children (foi base i)) acc
       in
-      Array.fold_left
-        filter (Array.fold_left filter [] (get_family fath)) (get_family moth)
+      let hs =
+        let ifath = get_father f in
+        if ifath = Adef.iper_of_int (-1) then []
+        else Array.fold_left filter [] (get_family @@ poi base ifath)
+      in
+      let imoth = get_mother f in
+      if imoth = Adef.iper_of_int (-1) then hs
+      else Array.fold_left filter hs (get_family @@ poi base imoth)
     | None -> []
 
   let slash_baptism_date conf p =
