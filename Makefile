@@ -45,6 +45,7 @@ clean:
 .PHONY: clean
 
 launch:
+	OCAMLRUNPARAM=b \
 	_build/default/src/gwd.exe \
 	$(DEV) \
 	-p 2318 \
