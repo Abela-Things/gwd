@@ -121,33 +121,29 @@ and date_compare = func_arg2_no_kw date_compare_aux
 
 and date_eq = func_arg2_no_kw (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
-and mk_date d =
-  let opt =
-    match d with
-    | Def.Dtext _ -> fun _ -> Tnull
-    | Dgreg (d, c) -> fun fn -> fn d c
-  in
-  let year = opt (fun d _ -> Tint d.Def.year) in
-  let month = opt (fun d _ -> Tint d.Def.month) in
-  let day = opt (fun d _ -> Tint d.Def.day) in
-  let prec = opt (fun d _ -> Tstr (to_prec d.Def.prec)) in
-  let d2 = opt (fun d c -> match d.Def.prec with
+and mk_date = function
+  | Def.Dtext s -> Tstr s
+  | Dgreg (d, c) ->
+    let year = Tint d.Def.year in
+    let month = Tint d.Def.month in
+    let day = Tint d.Def.day in
+    let prec = to_prec d.Def.prec in
+    let d2 = match d.Def.prec with
       | OrYear d2 | YearInt d2 ->
         mk_date (Def.Dgreg ( { Def.day = d2.Def.day2
                              ; month = d2.Def.month2
                              ; year = d2.Def.year2
                              ; prec = Def.Sure ; delta = 0 }
                            , c) )
-      | _ -> Tnull )
-  in
-  let calendar =
-    opt (fun _ -> function
-        | Dgregorian -> Tstr "Dgregorian"
-        | Djulian -> Tstr "Djulian"
-        | Dfrench -> Tstr "Dfrench"
-        | Dhebrew -> Tstr "Dhebrew")
-  in
-  Tpat (function
+      | _ -> Tnull
+    in
+    let calendar = match c with
+      | Dgregorian -> Tstr "Dgregorian"
+      | Djulian -> Tstr "Djulian"
+      | Dfrench -> Tstr "Dfrench"
+      | Dhebrew -> Tstr "Dhebrew"
+    in
+    Tpat begin function
       | "calendar" -> calendar
       | "d2" -> d2
       | "day" -> day
@@ -157,27 +153,27 @@ and mk_date d =
       | "__compare__" -> date_compare
       | "__eq__" -> date_eq
       | _ -> raise Not_found
-    )
+    end
 
 and to_dmy d =
-  let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
+  let int s = match Jg_runtime.jg_obj_lookup d s with Tint i -> i | _ -> 0 in
   { Def.day = int "day" ; month = int "month" ; year = int "year"
   ; prec = of_prec d
   ; delta = 0 }
 
 and to_dmy2 d =
-  let int s = unbox_int (Jg_runtime.jg_obj_lookup d s) in
+  let int s = match Jg_runtime.jg_obj_lookup d s with Tint i -> i | _ -> 0 in
   { Def.day2 = int "day" ; month2 = int "month" ; year2 = int "year"
   ; delta2 = 0 }
 
 and to_prec = function
-  | Def.Sure -> "sure"
-  | About -> "about"
-  | Maybe -> "maybe"
-  | Before -> "before"
-  | After -> "after"
-  | OrYear _ -> "oryear"
-  | YearInt _ -> "yearint"
+  | Def.Sure -> Tstr "sure"
+  | About -> Tstr "about"
+  | Maybe -> Tstr "maybe"
+  | Before -> Tstr "before"
+  | After -> Tstr "after"
+  | OrYear _ -> Tstr "oryear"
+  | YearInt _ -> Tstr "yearint"
 
 and of_prec d = match Jg_runtime.jg_obj_lookup d "prec" with
   | Tstr "sure" -> Def.Sure
@@ -196,7 +192,7 @@ and to_gregorian_aux calendar d =
   | "Djulian" -> Calendar.gregorian_of_julian d
   | "Dfrench" -> Calendar.gregorian_of_french d
   | "Dhebrew" -> Calendar.gregorian_of_hebrew d
-  | x -> print_endline @@ Printf.sprintf "%s: %s" __LOC__ x ; assert false
+  | _ -> assert false
 
 and module_date conf =
   let now =
@@ -215,8 +211,9 @@ and module_date conf =
   in
   let death_symbol = Date.death_symbol conf in
   let string_of_ondate =
-    func_arg1_no_kw @@ fun d ->
-    Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) )
+    func_arg1_no_kw @@ function
+    | Tstr _ as d -> d
+    | d -> Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) )
   in
   let code_french_year =
     func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
@@ -644,7 +641,7 @@ and mk_dmy { Def.day ; month ; year ; delta ; prec } =
   let month = Tint month in
   let year = Tint year in
   let delta = Tint delta in
-  let prec = Tstr (to_prec prec) in
+  let prec = to_prec prec in
   Tpat (function
       | "day" -> day
       | "month" -> month
@@ -891,9 +888,9 @@ and mk_warning conf base =
   | PossibleDuplicateFam _ -> assert false (* FIXME *)
 
 let module_OPT =
-  let map = func_arg2_no_kw begin fun fn -> let fn = unbox_fun fn in function
+  let map = func_arg2_no_kw begin fun fn -> function
       | Tnull -> Tnull
-      | x -> fn x
+      | x -> (unbox_fun fn) x
     end
   in
   Tpat begin function
