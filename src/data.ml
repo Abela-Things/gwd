@@ -121,8 +121,18 @@ and date_compare = func_arg2_no_kw date_compare_aux
 
 and date_eq = func_arg2_no_kw (fun d1 d2 -> Tbool (date_compare_aux d1 d2 = Tint 0))
 
+and dtext_eq =
+  func_arg2_no_kw @@ fun d1 d2 ->
+  Tbool ((Jg_runtime.jg_obj_lookup d1 "__str__") = (Jg_runtime.jg_obj_lookup d2 "__str__"))
+
 and mk_date = function
-  | Def.Dtext s -> Tstr s
+  | Def.Dtext s ->
+    Tpat begin function
+      | "__str__" -> Tstr s
+      | "__compare__" -> func_arg2_no_kw (fun _ _ -> Tint 0)
+      | "__eq__" -> dtext_eq
+      | _ -> raise Not_found
+    end
   | Dgreg (d, c) ->
     let year = Tint d.Def.year in
     let month = Tint d.Def.month in
