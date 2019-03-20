@@ -1277,6 +1277,8 @@ let json_encode o =
   write_json ob o ;
   Buffer.contents ob
 
+let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tvalue x ; Tnull
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1302,6 +1304,7 @@ let default_env conf base (* p *) =
   :: ("base", mk_base base)
   :: ("conf", conf_env)
   :: ("TWIG", twig)
+  :: ("LOG", log)
   :: []
 
 let sandbox (conf : Config.config) base =
