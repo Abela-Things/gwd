@@ -290,6 +290,44 @@ let handler =
           Interp.render ~conf ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
       end
 
+  ; notes = begin fun self conf base ->
+      let fnotes =
+        match Util.p_getenv conf.env "f" with
+        | Some f when NotesLinks.check_file_name f <> None -> f (* Usefulness? *)
+        | _ -> ""
+      in
+      match Util.p_getint conf.env "v" with
+      | None when Util.p_getenv conf.env "ref" <> Some "on" ->
+        let (nenv, note) = Notes.read_notes base fnotes in
+        let title =
+          try Util.safe_html (List.assoc "TITLE" nenv)
+          with Not_found -> ""
+        in
+        let file_path = Notes.file_path conf base in (* FIXME? fnotes? *)
+        let note = Util.string_with_macros conf [] note in
+        let edit_opt = Some (conf.wizard, "NOTES", fnotes) in
+        let note =
+          let wi =
+            { Wiki.wi_mode = "NOTES"
+            ; Wiki.wi_file_path = file_path
+            ; Wiki.wi_cancel_links = conf.cancel_links
+            ; Wiki.wi_person_exists = Util.person_exists conf base
+            ; Wiki.wi_always_show_link = conf.wizard || conf.friend
+            }
+          in
+          Wiki.html_with_summary_of_tlsw conf wi edit_opt note
+        in
+        let note = Util.safe_html note in
+        let models =
+          ("note", Tstr note)
+          :: ("title", Tstr title)
+          :: ("fnotes", Tstr fnotes)
+          :: Data.default_env conf base in
+        Interp.render ~conf ~file:"notes_full" ~models
+
+      | _ -> self.notes self conf base
+    end
+
   ; oa = restricted_friend @@ begin fun _self conf base ->
       let limit = Opt.default 0 (Util.p_getint conf.env "lim") in
       let get_oldest_alive p = match get_death p with
