@@ -77,8 +77,9 @@ let handler =
       | None -> self.incorrect_request self conf base
       | Some i ->
         try
-          if Util.p_getenv conf.env "return" <> None then self.chg_chn self conf base
-          else
+          let conf = Update.update_conf conf in
+          if Util.p_getenv conf.env "return" <> None then ChangeChildren.print_update_child conf base
+          else begin
             let models =
               try
                 let ip = Adef.iper_of_int i in
@@ -98,6 +99,7 @@ let handler =
                 ("error", Tbool true) :: Data.default_env conf base
             in
             Interp.render ~conf ~file:"chg_chn_ok" ~models
+          end
         with Update.ModErr -> () (* FIXME? *)
     end
 
