@@ -325,7 +325,7 @@ let handler =
           :: Data.default_env conf base in
         Interp.render ~conf ~file:"notes_full" ~models
 
-      | _ -> self.notes self conf base
+      | _ -> defaultHandler.notes self conf base
     end
 
   ; oa = restricted_friend @@ begin fun _self conf base ->
