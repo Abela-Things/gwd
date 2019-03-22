@@ -80,13 +80,7 @@ let ls dir filter =
   in
   loop [] [dir]
 
-let compile_dir verbose ext dir =
-  let env = { Jg_types.autoescape = false
-            ; template_dirs = [ dir ]
-            ; filters = []
-            ; extensions = []
-            ; strict_mode = false }
-  in
+let compile_dir verbose ext dir env =
   let files = ls dir (fun f -> Filename.check_suffix f ext) in
   List.iter (marshal verbose env) files
 
@@ -94,11 +88,12 @@ let () =
   Printexc.record_backtrace true ;
   try
     let usage =
-      "Usage: " ^ Filename.basename Sys.argv.(0) ^ " [options] where options are:"
+      "Usage: " ^ Filename.basename Sys.argv.(0) ^ " [OPTIONS] [FILE] where options are:"
     in
     let dir = ref "." in
     let verbose = ref true in
     let ext = ref ".html.jingoo" in
+    let fname = ref "" in
     let speclist =
       [ ("--dir", Arg.Set_string dir, " Set the template dir (default is '.')")
       ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout)")
@@ -108,9 +103,16 @@ let () =
         , " Files to use in order to inline translations (separated by comma)")
       ]
     in
-    let anonfun s = raise (Arg.Bad s) in
+    let anonfun s = fname := s in
     Arg.parse speclist anonfun usage ;
-    print_endline @@ !dir ;
-    compile_dir !verbose !ext !dir
+    let env =
+      { Jg_types.autoescape = false
+      ; template_dirs = [ !dir ]
+      ; filters = []
+      ; extensions = []
+      ; strict_mode = false }
+    in
+    if !fname = "" then compile_dir !verbose !ext !dir env
+    else marshal !verbose env !fname
   with _ -> Printexc.print_backtrace stdout
 
