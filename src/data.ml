@@ -41,7 +41,7 @@ and cmp_prec d1 d2 =
   | _ -> Tint 0
 and field = Jg_runtime.jg_obj_lookup
 
-let rec mk_family (conf : Config.config) base fcd =
+let rec mk_family (conf : Config.config) base ((_, fam, _, _) as fcd) =
   let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
   let get_str = get box_string in
@@ -62,6 +62,8 @@ let rec mk_family (conf : Config.config) base fcd =
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
   let marriage_source = get_str (E.marriage_source conf base) in
+  let relation = mk_fam_relation (Gwdb.get_relation fam) in
+  let separation = mk_fam_separation (Gwdb.get_divorce fam) in
   let ifam = get_int E.ifam in
   let witnesses =
     try lazy_array (get_n_mk_person conf base) (E.witnesses fcd)
@@ -79,10 +81,30 @@ let rec mk_family (conf : Config.config) base fcd =
     | "marriage_source" -> marriage_source
     | "mother" -> mother
     | "origin_file" -> origin_file
+    | "relation" -> relation
+    | "separation" -> separation
     | "spouse" -> spouse
     | "witnesses" -> witnesses
     | _ -> raise Not_found
   end
+
+and mk_fam_relation = function
+  | Married -> Tstr "MARRIED"
+  | NotMarried -> Tstr "NOT_MARRIED"
+  | Engaged -> Tstr "ENGAGED"
+  | NoSexesCheckNotMarried -> Tstr "NO_SEXES_CHECK_NOT_MARRIED"
+  | NoMention -> Tnull
+  | NoSexesCheckMarried -> Tstr "NO_SEXES_CHECK_MARRIED"
+  | MarriageBann -> Tstr "MARRIAGE_BANN"
+  | MarriageContract -> Tstr "MARRIAGE_CONTRACT"
+  | MarriageLicense -> Tstr "MARRIAGE_LICENSE"
+  | Pacs -> Tstr "PACS"
+  | Residence -> Tstr "RESIDENCE"
+
+and mk_fam_separation = function
+  | Divorced _ -> Tstr "DIVORCED"
+  | Separated -> Tstr "SEPARATED"
+  | NotDivorced -> Tnull
 
 and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   let ifath = Gwdb.get_father cpl in
