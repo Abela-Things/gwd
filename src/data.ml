@@ -1081,7 +1081,7 @@ let mk_env conf =
       | "suffix" -> suffix
       | "url" -> url
       | "version" -> version
-      | _ -> raise Not_found
+      | x -> Tstr (Wserver.decode @@ List.assoc x conf.env)
     )
 
 let decode_varenv =
