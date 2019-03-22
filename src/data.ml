@@ -221,9 +221,12 @@ and module_date conf =
   in
   let death_symbol = Date.death_symbol conf in
   let string_of_ondate =
-    func_arg1_no_kw @@ function
+    func_arg1 @@ fun ?(kwargs=[])-> function
     | Tstr _ as d -> d
-    | d -> Tstr (Date.string_of_ondate conf @@ Def.Dgreg (to_dmy d, Def.Dgregorian) )
+    | d ->
+      let link = Opt.map_default false unbox_bool (List.assoc_opt "link" kwargs) in
+      Tstr (Date.string_of_ondate { conf with cancel_links = not link } @@
+            Def.Dgreg (to_dmy d, Def.Dgregorian) )
   in
   let code_french_year =
     func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))
