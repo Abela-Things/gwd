@@ -259,7 +259,6 @@ let handler =
                              | "p1" -> p1
                              | "p2" -> p2
                              | _ -> raise Not_found ) )
-              :: ( "string_of_burial", Tfun (fun ?kwargs:_ _ -> Tnull))
               :: env
             in
             Interp.render ~conf ~file:"mrg_ind" ~models
