@@ -200,6 +200,14 @@ let handler =
       Interp.render ~conf ~file:"lm" ~models
     end
 
+  ; mod_data = restricted_wizard begin fun self conf base ->
+      match Util.p_getenv conf.env "data" with
+      | Some ("place" | "src" | "occu") | None ->
+        defaultHandler.mod_data self conf base
+      | _ ->
+        self.incorrect_request self conf base
+    end
+
   ; mrg = restricted_wizard begin fun self conf base ->
       with_person self conf base @@ fun p ->
       let this_key_index = get_key_index p in
