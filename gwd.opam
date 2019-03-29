@@ -16,14 +16,6 @@ install: [ [ make "install" ] ]
 
 remove: [ [ make "uninstall" ] ]
 
-pin-depends: [
-  # geneweb need piqi and piqilib dev versions
-  [ "piqilib.dev" "git://github.com/alavrik/piqi" ]
-  [ "piqi.dev" "git://github.com/alavrik/piqi-ocaml" ]
-  [ "geneweb.dev" "git://github.com/geneanet/geneweb" ]
-  [ "jingoo.dev" "git://github.com/geneanet/jingoo" ]
-]
-
 depends: [
   "dune" { build>= "1.1.1" }
   "geneweb" { = "dev" }
