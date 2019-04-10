@@ -27,7 +27,6 @@ type env =
   ; sosa : (iper * (Sosa.t * person) option) list ref option
   ; sosa_ref : person option Lazy.t option
   ; src : string option
-  ; t_sosa : Perso.sosa_t option
   }
 
 let conf_w_baseprefix conf env =
@@ -47,24 +46,11 @@ let empty = { all_gp = None
             ; sosa = None
             ; sosa_ref = None
             ; src = None
-            ; t_sosa = None
             }
 
 let env = empty
 
 let get_env x = match x with Some x -> x | None -> raise Not_found
-
-let get_sosa conf base env r p =
-  try List.assoc (get_key_index p) !r
-  with Not_found ->
-    let s =
-      match env.sosa_ref with
-      | None -> None
-      | Some v -> match env.t_sosa with
-        | Some t_sosa -> Perso.find_sosa conf base p v t_sosa
-        | None -> None
-    in
-    r := (get_key_index p, s) :: !r; s
 
 let mk_note conf base p note =
   (* FIXME WTF IS THAT? *)
@@ -255,10 +241,6 @@ module Person = struct
   let image_url conf base p =
     Perso.string_of_image_url conf base (p, true) false
 
-  let ind_access p =
-    (* deprecated since 5.00: rather use "i=%index;" *)
-    "i=" ^ string_of_int (Adef.int_of_iper (get_key_index p))
-
   let is_accessible_by_key conf base p =
     Util.accessible_by_key
       conf base p (p_first_name base p) (p_surname base p)
@@ -286,28 +268,6 @@ module Person = struct
       fn, sn, get_occ p
     in
     List.fold_left (Perso.linked_page_text conf base p s key) "" db
-
-  let mark_descendants conf base p =
-    let r = get_env env.desc_mark in
-    let tab = Array.make (nb_of_persons base) false in
-    let rec mark_descendants len p =
-      let i = Adef.int_of_iper (get_key_index p) in
-      if tab.(i) then ()
-      else
-        begin
-          tab.(i) <- true;
-          let u = p in
-          for i = 0 to Array.length (get_family u) - 1 do
-            let des = foi base (get_family u).(i) in
-            for i = 0 to Array.length (get_children des) - 1 do
-              mark_descendants (len + 1)
-                (pget conf base (get_children des).(i))
-            done
-          done
-        end
-    in
-    mark_descendants 0 p ;
-    r := tab; ""
 
   let marriage_age conf p =
     let (_, fam, _, m_auth) = get_env env.fam in
@@ -476,11 +436,11 @@ module Person = struct
       in
       let hs =
         let ifath = get_father f in
-        if ifath = Adef.iper_of_int (-1) then []
+        if ifath = Gwdb.dummy_iper then []
         else Array.fold_left filter [] (get_family @@ poi base ifath)
       in
       let imoth = get_mother f in
-      if imoth = Adef.iper_of_int (-1) then hs
+      if imoth = Gwdb.dummy_iper then hs
       else Array.fold_left filter hs (get_family @@ poi base imoth)
     | None -> []
 
@@ -586,18 +546,6 @@ module Person = struct
     | Some d -> Date.string_slash_of_date conf d
     | _ -> ""
 
-  let prev_fam_father _p =
-    let (_, _, (ifath, _, _), _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_iper ifath)
-
-  let prev_fam_index _p =
-    let (ifam, _, _, _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_ifam ifam)
-
-  let prev_fam_mother _p =
-    let (_, _, (_, imoth, _), _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_iper imoth)
-
   let public_name base p =
     sou base (get_public_name p)
 
@@ -612,23 +560,8 @@ module Person = struct
   let sex p =
     index_of_sex (get_sex p)
 
-  let sosa conf base env r p =
-    get_sosa conf base env r p
-
-  let sosa_in_list p =
-    let all_gp = get_env env.all_gp in
-    match Perso.get_link all_gp (get_key_index p) with
-      Some (Perso.GP_person (s, _, _)) -> Sosa.to_string s
-    | _ -> ""
-
-  let sosa_link conf base p =
-    let x = get_env env.sosa in
-    match get_sosa conf base env x p with
-    | Some (n, q) ->
-      Printf.sprintf "m=RL;i1=%d;i2=%d;b1=1;b2=%s"
-        (Adef.int_of_iper (get_key_index p))
-        (Adef.int_of_iper (get_key_index q)) (Sosa.to_string n)
-    | None -> ""
+  let sosa p =
+    Perso.get_sosa_person p
 
   let source conf base p =
     let s = get_env env.src in
@@ -820,11 +753,6 @@ module Family = struct
 
   let children (_, fam, _, _) = get_children fam
 
-  let desc_level (ifam, _, _, _) =
-    let levt = get_env env.desc_level_table in
-    let (_, flevt) = Lazy.force levt in
-    string_of_int flevt.(Adef.int_of_ifam ifam)
-
   let divorce_date conf (_, fam, _, m_auth) =
     match get_divorce fam with
     | Divorced d ->
@@ -840,7 +768,7 @@ module Family = struct
     if env.f_link = None then ifath else raise Not_found
 
   let ifam (ifam, _, _, _) =
-    Adef.int_of_ifam ifam
+    Gwdb.string_of_ifam ifam
 
   let is_no_mention (_, fam, _, _) =
     get_relation fam = NoMention
@@ -908,11 +836,6 @@ module Family = struct
   let origin_file conf base (_, fam, _, _) =
     if conf.wizard then sou base (get_origin_file fam)
     else raise Not_found
-
-  let set_infinite_desc_level (ifam, _, _, _) =
-    let levt = get_env env.desc_level_table in
-    let (_, flevt) = Lazy.force levt in
-    flevt.(Adef.int_of_ifam ifam) <- Perso.infinite; ""
 
   let spouse_iper (_, _, (_, _, ip), _) = ip
 

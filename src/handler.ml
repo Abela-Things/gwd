@@ -59,9 +59,9 @@ let handler =
     end
 
   ; chg_chn = restricted_wizard begin fun self conf base ->
-        match Util.p_getint conf.env "ip" with
+        match Util.p_getenv conf.env "ip" with
         | Some ip ->
-          let ip = Adef.iper_of_int ip in
+          let ip = Gwdb.iper_of_string ip in
           let digest = ChangeChildren.digest_children base (Ezgw.Person.children base @@ Gwdb.poi base ip) in
           let models =
             ("digest", Tstr digest)
@@ -73,7 +73,7 @@ let handler =
     end
 
   ; chg_chn_ok = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "ip" with
+      match Util.p_getenv conf.env "ip" with
       | None -> self.incorrect_request self conf base
       | Some i ->
         try
@@ -82,7 +82,7 @@ let handler =
           else begin
             let models =
               try
-                let ip = Adef.iper_of_int i in
+                let ip = Gwdb.iper_of_string i in
                 let p = Gwdb.poi base ip in
                 let ipl = Ezgw.Person.children base p in
                 ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
@@ -117,10 +117,10 @@ let handler =
     end
 
   ; del_ind = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "i" with
+      match Util.p_getenv conf.env "i" with
       | Some i ->
         let models =
-          ("ind", Data.get_n_mk_person conf base (Adef.iper_of_int i))
+          ("ind", Data.get_n_mk_person conf base (Gwdb.iper_of_string i))
           :: Data.default_env conf base
         in
         Interp.render ~conf ~file:"del_ind" ~models
@@ -128,13 +128,12 @@ let handler =
     end
 
   ; del_ind_ok = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "i" with
+      match Util.p_getenv conf.env "i" with
       | Some i ->
-        let ip = Adef.iper_of_int i in
+        let ip = Gwdb.iper_of_string i in
         let p = poi base ip in
         let fn = sou base (get_first_name p) in
         let sn = sou base (get_surname p) in
-        let occ = get_occ p in
         let old_related = get_related p in
         let op = Util.string_gen_person base (gen_person_of_person p) in
         UpdateIndOk.update_relations_of_related base ip old_related;
@@ -145,7 +144,6 @@ let handler =
         if fn <> "?" && sn <> "?" then
           Util.patch_cache_info conf Util.cache_nb_base_persons
             (fun v -> let v = int_of_string v - 1 in string_of_int v);
-        Gwdb.delete_key base fn sn occ;
         Notes.update_notes_links_db conf (NotesLinks.PgInd p.key_index) "";
         Util.commit_patches conf base;
         let changed = Def.U_Delete_person op in
@@ -229,20 +227,20 @@ let handler =
     end
 
   ; mrg_ind = restricted_wizard begin fun _self conf base ->
-      try match Util.p_getint conf.env "i" with
+      try match Util.p_getenv conf.env "i" with
         | None -> raise Not_found
         | Some i ->
-          let ip1 = Adef.iper_of_int i in
+          let ip1 = Gwdb.iper_of_string i in
           let ip2 =
-            match Util.p_getint conf.env "i2" with
-            | Some i2 -> Adef.iper_of_int i2
+            match Util.p_getenv conf.env "i2" with
+            | Some i2 -> Gwdb.iper_of_string i2
             | None -> match Util.p_getenv conf.env "select", Util.p_getenv conf.env "n" with
               | (Some "input" | None), Some n ->
                 begin match Gutil.person_ht_find_all base n with
                   | [ip2] -> ip2
                   | _ -> raise Not_found
                 end
-              | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
+              | Some x, (Some "" | None) -> Gwdb.iper_of_string x
               | _ -> raise Not_found
           in
           let p1 = Gwdb.poi base ip1 in

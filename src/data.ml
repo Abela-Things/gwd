@@ -48,7 +48,6 @@ let rec mk_family (conf : Config.config) base fcd =
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
   let get_str = get box_string in
   let get_bool = get box_bool in
-  let get_int = get box_int in
   let f = E.father fcd in
   let m = E.mother fcd in
   let divorce_date = get_str (E.divorce_date conf) in
@@ -73,7 +72,7 @@ let rec mk_family (conf : Config.config) base fcd =
   let are_not_married = get_bool E.are_not_married in
   let is_no_mention = get_bool E.is_no_mention in
   let is_no_sexes_check = get_bool E.is_no_sexes_check in
-  let ifam = get_int E.ifam in
+  let ifam = get_str E.ifam in
   let witnesses =
     try lazy_array (get_n_mk_person conf base) (E.witnesses fcd)
     with Not_found -> Tnull
@@ -103,7 +102,7 @@ let rec mk_family (conf : Config.config) base fcd =
       | _ -> raise Not_found
     )
 
-and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
+and get_n_mk_family conf base ?(origin = Gwdb.dummy_iper) ifam cpl =
   let ifath = Gwdb.get_father cpl in
   let imoth = Gwdb.get_mother cpl in
   let cpl =
@@ -274,7 +273,7 @@ and lazy_list : 'a . ('a -> tvalue) -> 'a list -> tvalue = fun fn -> function
 
 and lazy_get_n_mk_person conf base i =
   let lp = lazy (get_n_mk_person conf base i) in
-  let iper = Tint (Adef.int_of_iper i) in
+  let iper = Tstr (Gwdb.string_of_iper i) in
   Tpat (function "iper" -> iper | s -> unbox_pat (Lazy.force lp) @@ s)
 
 and pget conf base ip =
@@ -282,7 +281,6 @@ and pget conf base ip =
   let open Config in
   let open Def in
   let open Gwdb in
-  let dummy_iper = Adef.iper_of_int (-1) in
   if ip = dummy_iper
   then Tpat (fun _ -> Tnull)
   else
@@ -304,7 +302,7 @@ and pget conf base ip =
       else unsafe_mk_semi_public_person conf base p
     else unsafe_mk_person conf base p
 
-and get_n_mk_person conf base (i : Adef.iper) =
+and get_n_mk_person conf base (i : Gwdb.iper) =
   try Hashtbl.find person_ht i
   with Not_found ->
     let p = pget conf base i in
@@ -313,7 +311,7 @@ and get_n_mk_person conf base (i : Adef.iper) =
 
 and mk_related conf base acc =
   let mk_rel i t s =
-    let iper = Tint (Adef.int_of_iper i) in
+    let iper = Tstr (Gwdb.string_of_iper i) in
     let kind = match t with
       | Def.Adoption -> Tstr "ADOPTION"
       | Def.Recognition -> Tstr "RECOGNITION"
@@ -340,6 +338,7 @@ and mk_related conf base acc =
 and mk_witness_kind = function
   | Def.Witness -> Tstr "WITNESS"
   | Def.Witness_GodParent -> Tstr "WITNESS_GODPARENT"
+  | Def.Witness_Officer -> Tstr "WITNESS_OFFICER"
 
 and mk_event conf base d =
   let module E = Ezgw.Event in
@@ -358,7 +357,7 @@ and mk_event conf base d =
       (* We may want to filter on [ip] or [k] before really accessing the person entity *)
       Tarray (Array.mapi (fun i (ip, k) ->
           let kind = mk_witness_kind k in
-          let iper = Tint (Adef.int_of_iper ip) in
+          let iper = Tstr (Gwdb.string_of_iper ip) in
           Tpat (function
               | "kind" -> kind
               | "iper" -> iper
@@ -431,7 +430,7 @@ and unsafe_mk_semi_public_person conf base (p : Gwdb.person) =
   let access = get_str (E.access conf base) in
   let mother = mk_parent Gwdb.get_mother in
   let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
-  let iper = Tint (Adef.int_of_iper iper') in
+  let iper = Tstr (Gwdb.string_of_iper iper') in
   let related =
     match E.rparents p with
     | [] -> Tlist []
@@ -515,7 +514,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let first_name_key = get_str (E.first_name_key base) in
   let first_name_key_val = get_str (E.first_name_key_val base) in
   let image_url = get_str (fun p -> E.image_url conf base p) in
-  let iper = Tint (Adef.int_of_iper iper') in
+  let iper = Tstr (Gwdb.string_of_iper iper') in
   let is_birthday = get_bool (E.is_birthday conf) in
   let linked_page =
     box_lazy @@
@@ -935,11 +934,11 @@ let mk_conf conf base =
   let default_lang = Tstr conf.default_lang in
   let default_sosa_ref =
     let (iper, _p) = conf.default_sosa_ref in
-    let person = match Adef.int_of_iper iper with
-      | -1 -> Tnull
-      | _ -> Tlazy (lazy (get_n_mk_person conf base iper) )
+    let person =
+      if iper = Gwdb.dummy_iper then Tnull
+      else Tlazy (lazy (get_n_mk_person conf base iper) )
     in
-    Tobj [ ( "iper", Tint (Adef.int_of_iper iper))
+    Tobj [ ( "iper", Tstr (Gwdb.string_of_iper iper))
          ; ( "person", person ) ] in
   let multi_parents = Tbool conf.multi_parents in
   let can_send_image = Tbool conf.can_send_image in
@@ -1158,7 +1157,8 @@ let trans_a_of_b conf =
   end
 
 let get_person conf base = func_arg1_no_kw @@ function
-  | Tint i -> get_n_mk_person conf base (Adef.iper_of_int i)
+  | Tint i -> get_n_mk_person conf base (Gwdb.iper_of_string @@ string_of_int i)
+  | Tstr i -> get_n_mk_person conf base (Gwdb.iper_of_string i)
   | x -> failwith_type_error_1 "GET_PERSON" x
 
 (* copy/paste from Yojson adapted to Jingoo *)
@@ -1313,7 +1313,11 @@ let default_env conf base (* p *) =
 let sandbox (conf : Config.config) base =
   let get_family = func_arg1_no_kw @@ function
     | Tint i ->
-      let ifam = Adef.ifam_of_int i in
+      let ifam = Gwdb.ifam_of_string @@ string_of_int i in
+      let cpl = Gwdb.foi base ifam in
+      get_n_mk_family conf base ifam cpl
+    | Tstr i ->
+      let ifam = Gwdb.ifam_of_string i in
       let cpl = Gwdb.foi base ifam in
       get_n_mk_family conf base ifam cpl
     | x -> failwith_type_error_1 "GET_FAMILY" x
