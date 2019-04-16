@@ -1,6 +1,5 @@
-open Geneweb
 open Def
-open Data
+open Gwd_lib.Data
 
 let dmy ?(prec = Sure) day month year =
   { year ; month ; day ; delta = 0 ; prec }

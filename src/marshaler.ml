@@ -28,7 +28,7 @@ let marshal verbose env file =
     |> Jg_ast_optimize.dead_code_elimination
   in
   let de, en, es, fi, fr, it, nl, no, pt, sv =
-    Lazy.force Trans.de_en_es_fi_fr_it_nl_no_pt_sv
+    Lazy.force Gwd_lib.Trans.de_en_es_fi_fr_it_nl_no_pt_sv
   in
   List.iter
     (fun (lang, trans) ->
@@ -99,7 +99,7 @@ let () =
       ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout)")
       ; ( "--file-extension", Arg.Set_string ext
         , " Filter on file extension (default is .html.jingoo)")
-      ; ("--lexicon", Arg.String (fun s -> Trans.lexicon_files := String.split_on_char ',' s)
+      ; ("--lexicon", Arg.String (fun s -> Gwd_lib.Trans.lexicon_files := String.split_on_char ',' s)
         , " Files to use in order to inline translations (separated by comma)")
       ]
     in

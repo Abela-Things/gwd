@@ -14,6 +14,12 @@ bench:
 doc:
 	dune build @doc-private
 
+gwd.install:
+	dune build @install
+
+install: gwd.install
+	dune install gwd
+
 DOCDIR=_build/default/_doc/_html/
 
 gh-pages: doc

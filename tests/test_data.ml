@@ -2,9 +2,8 @@ open OUnit2
 open Jingoo
 open Jg_types
 open Jg_runtime
-open Geneweb
 open Def
-open Data
+open Gwd_lib.Data
 open Test_utils
 
 let field = Jg_runtime.jg_obj_lookup
@@ -15,7 +14,7 @@ let assert_equal_tvalue ?(printer = Jg_types.show_tvalue) a b =
 
 let test_mk_date _ctx =
   let rec test ({ year ; month ; day ; prec ; _ } as d) =
-    let open Data in
+    let open Gwd_lib.Data in
     let d = date d in
     assert_equal_tvalue (Tint day) (field d "day") ;
     assert_equal_tvalue (Tint month) (field d "month") ;
