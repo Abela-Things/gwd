@@ -145,23 +145,6 @@ module Person = struct
 
   let children base p = ChangeChildren.select_children_of base p
 
-  (* let child conf base p =
-   *   match get_env "child" env with
-   *     Vind p when mode_local env ->
-   *     let auth = authorized_age conf base p in
-   *     let ep = p, auth in eval_person_field_var conf base env ep loc sl *)
-
-  let child_name conf base p =
-    let force_surname =
-      match get_parents p with
-        None -> false
-      | Some ifam ->
-        p_surname base (pget conf base (get_father (foi base ifam))) <>
-        p_surname base p
-    in
-    if force_surname then person_text conf base p
-    else person_text_no_surn_no_acc_chk conf base p
-
   let consanguinity p =
     let c = get_consang p in
     if c != Adef.fix (-1) && c >= Adef.fix_of_float 0.0001
@@ -177,28 +160,11 @@ module Person = struct
   let death p =
     get_death p
 
-  (* FIXME *)
-  let death_age conf p =
-    match Date.get_birth_death_date p with
-    | Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _)),
-      Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)), approx
-      when d1 <> d2 ->
-      let a = CheckItem.time_elapsed d1 d2 in
-      let s =
-        if not approx && d1.prec = Sure && d2.prec = Sure then ""
-        else transl_decline conf "possibly (date)" "" ^ " "
-      in
-      s ^ Date.string_of_age conf a
-    | _ -> ""
-
   let death_place conf base p =
     Util.string_of_place conf (sou base (get_death_place p))
 
   let death_note conf base p =
     mk_note conf base p (get_death_note p)
-
-  let died conf p =
-    Perso.string_of_died conf p true
 
   let digest base p =
     Update.digest_person (UpdateInd.string_person_of base p)
@@ -408,20 +374,6 @@ module Person = struct
     in
     string_with_macros conf [] s
 
-  let on_baptism_date conf ?(long_date = false) p =
-    match Adef.od_of_cdate (get_baptism p) with
-    | Some d ->
-      if long_date then Date.string_of_ondate conf d ^ Date.get_wday conf d
-      else Date.string_of_ondate conf d
-    | _ -> raise Not_found
-
-  let on_birth_date conf ?(long_date = false) p =
-    match Adef.od_of_cdate (get_birth p) with
-    | Some d ->
-      if long_date then Date.string_of_ondate conf d ^ Date.get_wday conf d
-      else Date.string_of_ondate conf d
-    | _ -> raise Not_found
-
   let parents p = get_parents p
 
   let pnote = notes
@@ -484,38 +436,8 @@ module Person = struct
       else Array.fold_left filter hs (get_family @@ poi base imoth)
     | None -> []
 
-  let slash_baptism_date conf p =
-    match Adef.od_of_cdate (get_baptism p) with
-    | Some d -> Date.string_slash_of_date conf d
-    | _ -> ""
-
-  let slash_birth_date conf p =
-    match Adef.od_of_cdate (get_birth p) with
-    | Some d -> Date.string_slash_of_date conf d
-    | _ -> ""
-
-  let slash_approx_birth_date conf base p =
-    match fst (Util.get_approx_birth_date_place conf base p) with
-    | Some d -> Date.string_slash_of_date conf d
-    | _ -> ""
-
   let static_max_ancestor_level conf base p =
     Perso.max_ancestor_level conf base (get_key_index p) 120 + 1
-
-  (* FIXME *)
-  let on_burial_date conf p =
-    match get_burial p with
-    | Buried cod ->
-      begin match Adef.od_of_cdate cod with
-        | Some d ->
-          begin match p_getenv conf.base_env "long_date" with
-              Some "yes" ->
-              Date.string_of_ondate conf d ^ Date.get_wday conf d
-            | _ -> Date.string_of_ondate conf d
-          end
-        | _ -> ""
-      end
-    | _ -> raise Not_found
 
   let psources conf base p =
     if not conf.no_note then
@@ -892,18 +814,6 @@ module Family = struct
 
   let nb_children (_, fam, _, _) =
     Array.length (get_children fam)
-
-  let on_marriage_date conf (_, fam, _, m_auth) =
-    if m_auth then
-      match Adef.od_of_cdate (get_marriage fam) with
-      | Some s ->
-        begin match p_getenv conf.base_env "long_date" with
-          | Some "yes" ->
-            Date2.string_of_ondate conf s ^ Date2.get_wday conf s
-          | _ -> Date2.string_of_ondate conf s
-        end
-      | _ -> raise Not_found
-    else raise Not_found
 
   let origin_file conf base (_, fam, _, _) =
     if conf.wizard then sou base (get_origin_file fam)

@@ -1,5 +1,3 @@
-(* TODO: remove on_XXX_date and use template for this. *)
-
 open Geneweb
 open Jingoo
 open Jg_types
@@ -65,7 +63,6 @@ let rec mk_family (conf : Config.config) base fcd =
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
   let marriage_source = get_str (E.marriage_source conf base) in
-  let on_marriage_date = get_str (E.on_marriage_date conf) in
   let are_divorced = get_bool E.are_divorced in
   let are_separated = get_bool E.are_separated in
   let are_married = get_bool E.are_married in
@@ -96,7 +93,6 @@ let rec mk_family (conf : Config.config) base fcd =
       | "marriage_note" -> marriage_note
       | "marriage_source" -> marriage_source
       | "mother" -> mother
-      | "on_marriage_date" -> on_marriage_date
       | "origin_file" -> origin_file
       | "spouse" -> spouse
       | "witnesses" -> witnesses
@@ -494,9 +490,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let cremation_place = get_str (E.cremation_place conf base) in
   let dates = get_str (E.dates conf base) in
   let death = get mk_death E.death in
-  let death_age = get_str (E.death_age conf) in
   let death_place = get_str (E.death_place conf base) in
-  let died = get_str (E.died conf) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
   let events = lazy_list (mk_event conf base) (E.events conf base p) in
   let lazy_families = lazy (Array.map (fun ifam -> ifam, Gwdb.foi base ifam) @@ Gwdb.get_family p) in
@@ -531,11 +525,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let titles = lazy_list (mk_title base) (E.titles p) in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
-  let on_baptism_date = get_str (E.on_baptism_date conf) in
-  let on_birth_date = get_str (E.on_birth_date conf) in
-  let on_burial_date = get_str (E.on_burial_date conf) in
-  let on_cremation_date = get_str (E.on_cremation_date conf) in
-  let on_death_date = get_str (E.on_death_date conf) in
   let public_name = get_str (E.public_name base) in
   let qualifier = get_str (E.qualifier base) in
   let qualifiers =
@@ -585,9 +574,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "consanguinity" -> consanguinity
       | "dates" -> dates
       | "death" -> death
-      | "death_age" -> death_age
       | "death_place" -> death_place
-      | "died" -> died
       | "digest" -> digest
       | "events" -> events
       | "families" -> families
@@ -606,11 +593,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "nb_families" -> nb_families
       | "occ" -> occ
       | "occupation" -> occupation
-      | "on_baptism_date" -> on_baptism_date
-      | "on_birth_date" -> on_birth_date
-      | "on_burial_date" -> on_burial_date
-      | "on_cremation_date" -> on_cremation_date
-      | "on_death_date" -> on_death_date
       | "public_name" -> public_name
       | "qualifier" -> qualifier
       | "qualifiers" -> qualifiers
