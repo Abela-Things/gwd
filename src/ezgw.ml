@@ -8,7 +8,6 @@ open Config
 open Def
 open Gwdb
 open Util
-module Date2 = Date
 
 type fam = (ifam * family * (iper * iper * iper) * bool)
 
@@ -27,7 +26,6 @@ type env =
   ; sosa : (iper * (Sosa.t * person) option) list ref option
   ; sosa_ref : person option Lazy.t option
   ; src : string option
-  ; t_sosa : Perso.sosa_t option
   }
 
 let conf_w_baseprefix conf env =
@@ -47,24 +45,11 @@ let empty = { all_gp = None
             ; sosa = None
             ; sosa_ref = None
             ; src = None
-            ; t_sosa = None
             }
 
 let env = empty
 
 let get_env x = match x with Some x -> x | None -> raise Not_found
-
-let get_sosa conf base env r p =
-  try List.assoc (get_key_index p) !r
-  with Not_found ->
-    let s =
-      match env.sosa_ref with
-      | None -> None
-      | Some v -> match env.t_sosa with
-        | Some t_sosa -> Perso.find_sosa conf base p v t_sosa
-        | None -> None
-    in
-    r := (get_key_index p, s) :: !r; s
 
 let mk_note conf base p note =
   (* FIXME WTF IS THAT? *)
@@ -94,7 +79,7 @@ module Person = struct
   let age conf p =
     match Adef.od_of_cdate (get_birth p), get_death p with
     | Some (Dgreg (d, _)), NotDead ->
-      CheckItem.time_elapsed d conf.today
+      Date.time_elapsed d conf.today
     | _ -> raise Not_found
 
   let alias base p =
@@ -155,7 +140,7 @@ module Person = struct
     Util.string_of_place conf (sou base (get_burial_place p))
 
   let dates conf base p =
-    Date.short_dates_text conf base p
+    DateDisplay.short_dates_text conf base p
 
   let death p =
     get_death p
@@ -193,7 +178,7 @@ module Person = struct
   let nb_families conf p =
     match env.p_link with
     | Some _ ->
-      List.length (Perso_link.get_family_correspondance conf.command (get_key_index p))
+      List.length (Perso_link.get_family_correspondance conf.command (get_iper p))
     | _ ->
       Array.length (get_family p)
 
@@ -221,10 +206,6 @@ module Person = struct
   let image_url conf base p =
     Perso.string_of_image_url conf base (p, true) false
 
-  let ind_access p =
-    (* deprecated since 5.00: rather use "i=%index;" *)
-    "i=" ^ string_of_int (Adef.int_of_iper (get_key_index p))
-
   let is_accessible_by_key conf base p =
     Util.accessible_by_key
       conf base p (p_first_name base p) (p_surname base p)
@@ -235,7 +216,7 @@ module Person = struct
       if d.prec = Sure && get_death p = NotDead then
         d.day = conf.today.day && d.month = conf.today.month &&
         d.year < conf.today.year ||
-        not (CheckItem.leap_year conf.today.year) && d.day = 29 &&
+        not (Date.leap_year conf.today.year) && d.day = 29 &&
         d.month = 2 && conf.today.day = 1 && conf.today.month = 3
       else false
     | _ -> false
@@ -253,49 +234,13 @@ module Person = struct
     in
     List.fold_left (Perso.linked_page_text conf base p s key) "" db
 
-  let mark_descendants conf base p =
-    let r = get_env env.desc_mark in
-    let tab = Array.make (nb_of_persons base) false in
-    let rec mark_descendants len p =
-      let i = Adef.int_of_iper (get_key_index p) in
-      if tab.(i) then ()
-      else
-        begin
-          tab.(i) <- true;
-          let u = p in
-          for i = 0 to Array.length (get_family u) - 1 do
-            let des = foi base (get_family u).(i) in
-            for i = 0 to Array.length (get_children des) - 1 do
-              mark_descendants (len + 1)
-                (pget conf base (get_children des).(i))
-            done
-          done
-        end
-    in
-    mark_descendants 0 p ;
-    r := tab; ""
-
-  let marriage_age conf p =
-    let (_, fam, _, m_auth) = get_env env.fam in
-    if m_auth then
-      match
-        Adef.od_of_cdate (get_birth p),
-        Adef.od_of_cdate (get_marriage fam)
-      with
-        Some (Dgreg (({prec = Sure | About | Maybe ; _} as d1), _)),
-        Some (Dgreg (({prec = Sure | About | Maybe ; _} as d2), _)) ->
-        let a = CheckItem.time_elapsed d1 d2 in
-        Date.string_of_age conf a
-      | _ -> ""
-    else ""
-
   let max_ancestor_level conf base p =
     let emal =
       match p_getint conf.env "v" with
         Some i -> i
       | None -> 120
     in
-    Perso.max_ancestor_level conf base (get_key_index p) emal + 1
+    Perso.max_ancestor_level conf base (get_iper p) emal + 1
 
   let mother_age_at_birth conf base p =
     Perso.string_of_parent_age conf base (p, true) get_mother
@@ -389,14 +334,14 @@ module Person = struct
            | x -> x
          in
          match mk_date c1, mk_date c2 with
-         | Some d1, Some d2 -> if CheckItem.strictly_before d1 d2 then -1 else 1
+         | Some d1, Some d2 -> Date.compare_date d1 d2
          | _ -> -1)
     @@
     List.fold_left (fun list ic ->
         let c = pget conf base ic in
         List.fold_left (fun acc r -> match r.r_fath, r.r_moth with
-            | Some ip, _  when ip = get_key_index p -> (c, r) :: acc
-            | _ , Some ip when ip = get_key_index p -> (c, r) :: acc
+            | Some ip, _  when ip = get_iper p -> (c, r) :: acc
+            | _ , Some ip when ip = get_iper p -> (c, r) :: acc
             | _ -> acc)
           list (get_rparents c) )
       [] (List.sort_uniq compare (get_related p))
@@ -408,7 +353,7 @@ module Person = struct
   let siblings base p =
     match get_parents p with
     | Some ifam ->
-      let ip = get_key_index p in
+      let ip = get_iper p in
       Array.fold_right
         (fun i acc -> if i <> ip then i :: acc else acc)
         (get_children (foi base ifam))
@@ -418,7 +363,7 @@ module Person = struct
   let half_siblings base p =
     match get_parents p with
     | Some ifam ->
-      let ip = get_key_index p in
+      let ip = get_iper p in
       let f = foi base ifam in
       let filter = fun (acc : iper list) i ->
         if i = ifam then acc else
@@ -428,16 +373,16 @@ module Person = struct
       in
       let hs =
         let ifath = get_father f in
-        if ifath = Adef.iper_of_int (-1) then []
+        if ifath = dummy_iper then []
         else Array.fold_left filter [] (get_family @@ poi base ifath)
       in
       let imoth = get_mother f in
-      if imoth = Adef.iper_of_int (-1) then hs
+      if imoth = dummy_iper then hs
       else Array.fold_left filter hs (get_family @@ poi base imoth)
     | None -> []
 
   let static_max_ancestor_level conf base p =
-    Perso.max_ancestor_level conf base (get_key_index p) 120 + 1
+    Perso.max_ancestor_level conf base (get_iper p) 120 + 1
 
   let psources conf base p =
     if not conf.no_note then
@@ -455,15 +400,6 @@ module Person = struct
       if conf.pure_xhtml then Util.check_xhtml s else s
     else ""
 
-  let slash_burial_date conf p =
-    match get_burial p with
-    | Buried cod ->
-      begin match Adef.od_of_cdate cod with
-        | Some d -> Date.string_slash_of_date conf d
-        | _ -> ""
-      end
-    | _ -> raise Not_found
-
   let public_name base p =
     sou base (get_public_name p)
 
@@ -477,9 +413,6 @@ module Person = struct
 
   let sex p =
     index_of_sex (get_sex p)
-
-  let sosa conf base env r p =
-    get_sosa conf base env r p
 
   let source conf base p =
     let s = get_env env.src in
@@ -500,7 +433,7 @@ module Person = struct
     Array.map
       (fun ifam ->
          let fam = foi base ifam in
-         let isp = Gutil.spouse (get_key_index p) fam in
+         let isp = Gutil.spouse (get_iper p) fam in
          if authorized_age conf base (poi base isp) then sou base (get fam)
          else "")
       (get_family p)
@@ -550,11 +483,6 @@ module Family = struct
 
   let children (_, fam, _, _) = get_children fam
 
-  let desc_level (ifam, _, _, _) =
-    let levt = get_env env.desc_level_table in
-    let (_, flevt) = Lazy.force levt in
-    string_of_int flevt.(Adef.int_of_ifam ifam)
-
   let divorce_date (_, fam, _, m_auth) =
     if m_auth then match get_divorce fam with
       | Divorced d -> Adef.od_of_cdate d
@@ -566,7 +494,7 @@ module Family = struct
     if env.f_link = None then ifath else raise Not_found
 
   let ifam (ifam, _, _, _) =
-    Adef.int_of_ifam ifam
+    string_of_ifam ifam
 
   let marriage_date (_, fam, (_, _, _), m_auth) =
     if m_auth then Adef.od_of_cdate (get_marriage fam) else None
@@ -615,11 +543,6 @@ module Family = struct
   let origin_file conf base (_, fam, _, _) =
     if conf.wizard then sou base (get_origin_file fam)
     else raise Not_found
-
-  let set_infinite_desc_level (ifam, _, _, _) =
-    let levt = get_env env.desc_level_table in
-    let (_, flevt) = Lazy.force levt in
-    flevt.(Adef.int_of_ifam ifam) <- Perso.infinite; ""
 
   let spouse_iper (_, _, (_, _, ip), _) = ip
 

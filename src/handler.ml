@@ -34,7 +34,7 @@ let birth_death_aux conf base fn bool =
   let list =
     List.map
       (fun (p, d, c) ->
-         let person = Data.get_n_mk_person conf base (Gwdb.get_key_index p) in
+         let person = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
          let date = Data.mk_date (Dgreg (d, c) ) in
          Tpat (function
              | "person" -> person
@@ -59,9 +59,9 @@ let handler =
     end
 
   ; chg_chn = restricted_wizard begin fun self conf base ->
-        match Util.p_getint conf.env "ip" with
+        match Util.p_getenv conf.env "ip" with
         | Some ip ->
-          let ip = Adef.iper_of_int ip in
+          let ip = Gwdb.iper_of_string ip in
           let digest = ChangeChildren.digest_children base (Ezgw.Person.children base @@ Gwdb.poi base ip) in
           let models =
             ("digest", Tstr digest)
@@ -73,34 +73,32 @@ let handler =
     end
 
   ; chg_chn_ok = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "ip" with
+      match Util.p_getenv conf.env "ip" with
       | None -> self.incorrect_request self conf base
       | Some i ->
-        try
-          let conf = Update.update_conf conf in
-          if Util.p_getenv conf.env "return" <> None then ChangeChildren.print_update_child conf base
-          else begin
-            let models =
-              try
-                let ip = Adef.iper_of_int i in
-                let p = Gwdb.poi base ip in
-                let ipl = Ezgw.Person.children base p in
-                ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
-                let parent_surname = p_surname base p in
-                let changed = ChangeChildren.change_children conf base parent_surname ipl in
-                Util.commit_patches conf base;
-                let changed =
-                  Def.U_Change_children_name
-                    (Util.string_gen_person base (gen_person_of_person p), changed)
-                in
-                History.record conf base changed "cn";
-                ("ind", Data.get_n_mk_person conf base ip) :: Data.default_env conf base
-              with ChangeChildren.FirstNameMissing _ip ->
-                ("error", Tbool true) :: Data.default_env conf base
-            in
-            Interp.render ~conf ~file:"chg_chn_ok" ~models
-          end
-        with Update.ModErr -> () (* FIXME? *)
+        let conf = Update.update_conf conf in
+        if Util.p_getenv conf.env "return" <> None then ChangeChildren.print_update_child conf base
+        else begin
+          let models =
+            try
+              let ip = Gwdb.iper_of_string i in
+              let p = Gwdb.poi base ip in
+              let ipl = Ezgw.Person.children base p in
+              ChangeChildren.check_digest conf (ChangeChildren.digest_children base ipl);
+              let parent_surname = p_surname base p in
+              let changed = ChangeChildren.change_children conf base parent_surname ipl in
+              Util.commit_patches conf base;
+              let changed =
+                Def.U_Change_children_name
+                  (Util.string_gen_person base (gen_person_of_person p), changed)
+              in
+              History.record conf base changed "cn";
+              ("ind", Data.get_n_mk_person conf base ip) :: Data.default_env conf base
+            with ChangeChildren.FirstNameMissing _ip ->
+              ("error", Tbool true) :: Data.default_env conf base
+          in
+          Interp.render ~conf ~file:"chg_chn_ok" ~models
+        end
     end
 
   ; d = begin fun self conf base -> with_person self conf base @@ fun p ->
@@ -117,10 +115,10 @@ let handler =
     end
 
   ; del_ind = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "i" with
+      match Util.p_getenv conf.env "i" with
       | Some i ->
         let models =
-          ("ind", Data.get_n_mk_person conf base (Adef.iper_of_int i))
+          ("ind", Data.get_n_mk_person conf base (Gwdb.iper_of_string i))
           :: Data.default_env conf base
         in
         Interp.render ~conf ~file:"del_ind" ~models
@@ -128,13 +126,12 @@ let handler =
     end
 
   ; del_ind_ok = restricted_wizard begin fun self conf base ->
-      match Util.p_getint conf.env "i" with
+      match Util.p_getenv conf.env "i" with
       | Some i ->
-        let ip = Adef.iper_of_int i in
+        let ip = Gwdb.iper_of_string i in
         let p = poi base ip in
         let fn = sou base (get_first_name p) in
         let sn = sou base (get_surname p) in
-        let occ = get_occ p in
         let old_related = get_related p in
         let op = Util.string_gen_person base (gen_person_of_person p) in
         UpdateIndOk.update_relations_of_related base ip old_related;
@@ -145,7 +142,6 @@ let handler =
         if fn <> "?" && sn <> "?" then
           Util.patch_cache_info conf Util.cache_nb_base_persons
             (fun v -> let v = int_of_string v - 1 in string_of_int v);
-        Gwdb.delete_key base fn sn occ;
         Notes.update_notes_links_db conf (NotesLinks.PgInd p.key_index) "";
         Util.commit_patches conf base;
         let changed = Def.U_Delete_person op in
@@ -165,7 +161,7 @@ let handler =
           | Death (_, cd) -> begin match Adef.date_of_cdate cd with
               | Dgreg (dd, _) -> begin match Adef.od_of_cdate (get_birth p) with
                   | Some (Dgreg (bd, _)) ->
-                    Some (Def.Dgreg (CheckItem.time_elapsed bd dd, Dgregorian))
+                    Some (Def.Dgreg (Date.time_elapsed bd dd, Dgregorian))
                   | _ -> None
                 end
               | _ -> None
@@ -177,7 +173,7 @@ let handler =
       let data =
         List.map
           (fun (p, d, c) ->
-             Tset [ Data.get_n_mk_person conf base (Gwdb.get_key_index p)
+             Tset [ Data.get_n_mk_person conf base (Gwdb.get_iper p)
                   ; Data.mk_date (Dgreg (d, c) ) ] )
           (data)
       in
@@ -210,14 +206,14 @@ let handler =
 
   ; mrg = restricted_wizard begin fun self conf base ->
       with_person self conf base @@ fun p ->
-      let this_key_index = get_key_index p in
+      let this_key_index = get_iper p in
       let list =
         Gutil.find_same_name base p
         |> (fun list ->
             List.fold_right
               (fun p l ->
-                 if get_key_index p = this_key_index then l
-                 else Data.get_n_mk_person conf base (get_key_index p) :: l)
+                 if get_iper p = this_key_index then l
+                 else Data.get_n_mk_person conf base (get_iper p) :: l)
               list [])
       in
       let models =
@@ -229,20 +225,20 @@ let handler =
     end
 
   ; mrg_ind = restricted_wizard begin fun _self conf base ->
-      try match Util.p_getint conf.env "i" with
+      try match Util.p_getenv conf.env "i" with
         | None -> raise Not_found
         | Some i ->
-          let ip1 = Adef.iper_of_int i in
+          let ip1 = Gwdb.iper_of_string i in
           let ip2 =
-            match Util.p_getint conf.env "i2" with
-            | Some i2 -> Adef.iper_of_int i2
+            match Util.p_getenv conf.env "i2" with
+            | Some i2 -> Gwdb.iper_of_string i2
             | None -> match Util.p_getenv conf.env "select", Util.p_getenv conf.env "n" with
               | (Some "input" | None), Some n ->
                 begin match Gutil.person_ht_find_all base n with
                   | [ip2] -> ip2
                   | _ -> raise Not_found
                 end
-              | Some x, (Some "" | None) -> Adef.iper_of_int (int_of_string x)
+              | Some x, (Some "" | None) -> Gwdb.iper_of_string x
               | _ -> raise Not_found
           in
           let p1 = Gwdb.poi base ip1 in

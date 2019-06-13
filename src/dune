@@ -3,7 +3,7 @@
 (library
   (public_name gwxjg)
   (wrapped false)
-  (libraries geneweb jingoo)
+  (libraries unix geneweb.gwdb1 geneweb.wserver geneweb jingoo)
   (modules ezgw data trans lexicon_parser)
 )
 

@@ -2,7 +2,6 @@ open OUnit2
 open Jingoo
 open Jg_types
 open Jg_runtime
-open Geneweb
 open Def
 open Data
 open Test_utils

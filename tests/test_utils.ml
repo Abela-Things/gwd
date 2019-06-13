@@ -28,7 +28,7 @@ let conf
     ?(command = "")
     ?(ctime = 0.)
     ?(default_lang = "")
-    ?(default_sosa_ref = (Adef.iper_of_int (-1), None))
+    ?(default_sosa_ref = (Gwdb.dummy_iper, None))
     ?(denied_titles = lazy [])
     ?(env = [])
     ?(friend = false)
