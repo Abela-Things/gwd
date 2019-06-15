@@ -26,10 +26,3 @@
   (libraries uucp jingoo gwd_lib marshaler_lib)
   (modules marshaler)
 )
-
-; Dummy library used to generate doc
-(library
-  (name types)
-  (modules types)
-  (modules_without_implementation types)
-)

@@ -1,16 +1,13 @@
-(**/**)
-(** This is a fake module, used only to generate a doc templates designers. *)
-(**/**)
-[@@@ocaml.warning "-30"] (* Label defined in multiple types. *)
+# TYPE SYSTEM
 
-(**
-   In gwd, Geneweb data are converted into Jingoo's type system.
+In gwd, Geneweb data are converted into Jingoo's type system.
 
-   NB: Most of the time, fields can be undefined (i.e. represented by [null]).
+NB: Most of the time, fields can be undefined (i.e. represented by [null]).
 
-   For more informations, see {{:https://geneanet.github.io/jingoo/ocaml} jingoo}
-*)
+For more informations about [jingoo](https://geneanet.github.io/jingoo/ocaml),
+see [https://geneanet.github.io/jingoo/ocaml].
 
+```
 type 'a pat
 (** An object of type ['a]. ([Jingoo.Jg_types.Tpat]) *)
 
@@ -37,11 +34,13 @@ type 'a func
 
 type 'a mandatory
 (** An ['a] which can not be [null] *)
+```
 
-(** {2 Families and persons } *)
+## Families and persons
 
-(** {3 Family } *)
+### Family
 
+```
 type family =
   { are_divorced : bool
   ; are_married : bool
@@ -65,21 +64,21 @@ type family =
   ; spouse : person
   ; witnesses : person list
   }
-(**
-   A [family] is two parents, and 0 or more children.
+```
 
-   A few notes about the field of [family] structure:
+A `family` is two parents, and 0 or more children.
 
-   - [ifam] is the [family] indentifier.
-   - When the [family] is fetch from the field of a parent, [spouse] field
-     is set to the other parent of this family.
-     i.e. [mom.families[0].spouse = mom.families[0].father].
+A few notes about the field of `family` structure:
 
-*)
+- `ifam` is the `family` unique identifier.
+- When the `family` is fetch from the field of a parent, `spouse` field
+  is set to the other parent of this family.
+  i.e. `mom.families[0].spouse = mom.families[0].father`.
 
-(** {3 Person } *)
+### Person
 
-and person =
+```
+type person =
   { access : str
   ; age : dmy
   ; baptism_place : str
@@ -156,13 +155,18 @@ and person =
   ; title : int
   ; __str__ : str
   }
+```
 
-and title
+```
+type title
 (** Not implemented yet  *)
 
-(** {3 Date/dmy } *)
+```
 
-and date =
+### Date/dmy
+
+```
+type date =
   { calendar : str
   ; d2 : date
   ; day : int
@@ -172,48 +176,51 @@ and date =
   ; string_of_date_sep : (str -> str) func
   ; string_of_ondate : str
   ; year : int
-  ;__compare__ : (date -> date -> int) func
-  ;__eq__ : (date -> date -> bool) func
+  ; __compare__ : (date -> date -> int) func
+  ; __eq__ : (date -> date -> bool) func
   }
 (**
    - [calendar] can be: ["Dgregorian"], ["Djulian"], ["Dfrench"] or ["Dhebrew"]
    - [prec] can be: ["sure"], ["about"], ["maybe"], ["before"], ["after"], ["oryear"] or ["yearint"]
 *)
+```
 
-and dmy =
+```
+type dmy =
   { day : int
   ; delta : int
   ; month : int
   ; year : int
   }
+```
 
-(** {3 Death/Burial } *)
+### Death/Burial
 
-and burial
-(** {b A {!type:burial} is either the string ["UnknownBurial"]
-    or {!type:__burial} object.
-    }
-*)
+```
+type burial =
+  { type : str
+  ; date : date
+  }
+```
 
-and death =
+A `burial` is either the string `"UnknownBurial"`
+or a `burial` object.
+
+```
+type death =
   { death_reason : str
   ; date: date option
   }
-(** [death_reason] is either
-    ["DeadYoung"], ["DeadDontKnowWhen"], ["DontKnowIfDead"], ["OfCourseDead"],
-    ["Killed"], ["Murdered"], ["Executed"], ["Disappeared"] or ["Unspecified"].
-*)
+```
 
-and __burial =
-  { type_ : str
-  ; date : date
-  }
-(** {!recfield:__burial.type_} is actually accessible as [__burial.type] is the templates.
-    (written in documentataion as [type_] because [type] is an OCaml keyword.) *)
+`death_reason` is either
+`"DeadYoung"`, `"DeadDontKnowWhen"`, `"DontKnowIfDead"`, `"OfCourseDead"`,
+`"Killed"`, `"Murdered"`, `"Executed"`, `"Disappeared"` or `"Unspecified"`.
 
-(** {3 Event } *)
+### Event
 
-and event =
+```
+type event =
   { date : date
   ; kind : str
   ; name : str
@@ -223,14 +230,17 @@ and event =
   ; src : str
   ; witnesses : witness list
   }
+```
 
-and witness
-(** A {!type:witness} is a {!type:person} with an extra [kind]: {!type:str} field.
-*)
+```
+type witness
+```
+A `witness` is a `person` with an extra `kind : str` field.
 
-(** {3 Relation } *)
+## Relation
 
-and relation =
+```
+type relation =
   { has_relation_her : bool
   ; has_relation_him : bool
   ; related : person
@@ -239,12 +249,14 @@ and relation =
   ; relation_her : bool
   ; relation_him : bool
   }
+```
 
-(** {2 Conf } *)
+## Conf
 
-(** Global {!type:conf} object is available in templates with the toplevel variable [conf]. *)
+Global `conf` object is available in templates.
 
-and conf =
+```
+type conf =
   { access_by_key : bool
   ; allowed_titles : str list
   ; api_host : str
@@ -302,25 +314,59 @@ and conf =
   ; wizard : bool
   ; xhs : str
   }
+```
 
-and lexicon
+## Miscellaneous
 
-and time
+`json_encode` function is available to... encode a value in json format.
 
-(** {2 The sandbox } *)
+`trans` filter will use `lexicon`. If first unnamed parameter is an `int`,
+it uses the `nth` function of geneweb's lexicon. Named arguments are used
+to fill text in `foo bar:::XXX:YYY` format. Names of argument are not used,
+only the order of named arguments matters.
 
-(** Sandbox is accessible to wizard using [m=SANBDOX] get parameter.
+## OPT module
 
-    This page define some extra functions in the environement:
-*)
+```
+val map : ('a -> 'b) func -> [ 'a | Tnull ] -> [ 'a | Tnull ]
+```
+## DATE module
 
-val _GET_PERSON : int -> person
-val _GET_FAMILY : int -> family
-val _RANDOM_IPER : unit -> int
-val _RANDOM_IPER : unit -> int
+```
+val calendar : str -> date -> date
+```
+Convert a date into another calendar.
+`str` is destination calendar and may be
+`"Dgregorian"` `"Djulian"` `"Dfrench"` or `"Dhebrew"`
 
-module EVENT : sig
-  val string_of_event : event -> string
-end
+```
+val compare : date -> date -> int
+```
 
-val trans : string -> string
+```
+val death_symbol : str
+```
+
+```
+val code_french_year -> date -> str
+```
+
+```
+val eq : date -> date -> bool
+```
+
+```
+val now : date
+```
+
+```
+val string_of_age : date -> str
+```
+
+```
+val string_of_ondate : date -> str
+```
+
+```
+val sub : date -> date -> date
+```
