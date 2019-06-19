@@ -1,19 +1,19 @@
 (library
   (name test_lib)
   (wrapped false)
-  (libraries geneweb gwd_lib)
+  (libraries geneweb gwxjg)
   (modules test_utils)
 )
 
 (executable
   (name test)
-  (libraries jingoo test_lib gwd_lib marshaler_lib oUnit)
+  (libraries jingoo test_lib gwxjg marshaler_lib oUnit)
   (modules test test_data test_marshaler)
 )
 
 (executable
   (name bench)
-  (libraries benchmark test_lib gwd_lib oUnit)
+  (libraries benchmark test_lib gwxjg oUnit)
   (modules bench bench_data)
 )
 

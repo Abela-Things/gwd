@@ -1,4 +1,4 @@
 _build/
 Makefile.local
-gwd.install
+*.install
 .merlin

@@ -1,7 +1,7 @@
 (ocamllex lexicon_parser)
 
 (library
-  (name gwd_lib)
+  (public_name gwxjg)
   (wrapped false)
   (libraries geneweb jingoo)
   (modules ezgw data trans lexicon_parser)
@@ -10,19 +10,20 @@
 (library
   (name marshaler_lib)
   (wrapped false)
-  (libraries jingoo gwd_lib)
+  (libraries jingoo gwxjg)
   (modules marshaler_lib)
 )
 
 (executable
+  (package gwd)
   (name gwd)
   (public_name gwd)
-  (libraries gwd_lib marshaler_lib geneweb jingoo)
+  (libraries gwxjg marshaler_lib geneweb jingoo)
   (modules gwd handler interp)
 )
 
 (executable
   (name marshaler)
-  (libraries uucp jingoo gwd_lib marshaler_lib)
+  (libraries uucp jingoo gwxjg marshaler_lib)
   (modules marshaler)
 )
