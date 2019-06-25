@@ -131,6 +131,7 @@ and mk_date = function
       | "__str__" -> Tstr s
       | "__compare__" -> func_arg2_no_kw (fun _ _ -> Tint 0)
       | "__eq__" -> dtext_eq
+      | "__Dtext__" -> Tbool true
       | _ -> raise Not_found
     end
   | Dgreg (d, c) ->
@@ -221,12 +222,15 @@ and module_date conf =
   in
   let death_symbol = Date.death_symbol conf in
   let string_of_ondate =
-    func_arg1 @@ fun ?(kwargs=[])-> function
-    | Tstr _ as d -> d
-    | d ->
+    func_arg1 @@ fun ?(kwargs=[]) d ->
+    try
       let link = Opt.map_default false unbox_bool (List.assoc_opt "link" kwargs) in
       Tstr (Date.string_of_ondate { conf with cancel_links = not link } @@
             Def.Dgreg (to_dmy d, Def.Dgregorian) )
+    with e ->
+      if Jg_runtime.jg_obj_lookup d "__Dtext__" = Tbool true
+      then Jg_runtime.jg_obj_lookup d "__str__"
+      else raise e
   in
   let code_french_year =
     func_arg1_no_kw (fun i -> box_string @@ Date.code_french_year conf (unbox_int i))

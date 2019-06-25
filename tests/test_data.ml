@@ -71,6 +71,14 @@ let test_date_compare_list _ctx =
        ]
     )
 
+let test_date_string_of_ondate _ctx =
+  let md = Data.module_date @@ conf () in
+  let string_of_ondate = Jg_runtime.jg_obj_lookup md "string_of_ondate" in
+  let txt = "txt" in
+  assert_equal_tvalue
+    (Tstr txt)
+    (Jg_runtime.jg_apply string_of_ondate [ mk_date @@ Def.Dtext txt ])
+
 let test_json_encode _ctx =
   let str =
     {|Un évènement avec des "quotes" ou des 'single-quote', des \" et des \'|}
@@ -85,5 +93,6 @@ let suite =
   [ "test_mk_date" >:: test_mk_date
   ; "test_date_compare" >:: test_date_compare
   ; "test_date_compare_list" >:: test_date_compare_list
+  ; "test_date_string_of_ondate" >:: test_date_string_of_ondate
   ; "test_json_encode" >:: test_json_encode
   ]
