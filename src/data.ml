@@ -45,11 +45,10 @@ let rec mk_family (conf : Config.config) base fcd =
   let module E = Ezgw.Family in
   let get wrap fn = try wrap (fn fcd) with Not_found -> Tnull in
   let get_str = get box_string in
-  let get_bool = get box_bool in
   let get_int = get box_int in
   let f = E.father fcd in
   let m = E.mother fcd in
-  let divorce_date = get_str (E.divorce_date conf) in
+  let divorce_date = mk_opt mk_date (E.divorce_date fcd) in
   let father = lazy_get_n_mk_person conf base f in
   let mother = lazy_get_n_mk_person conf base m in
   let spouse =
@@ -63,41 +62,27 @@ let rec mk_family (conf : Config.config) base fcd =
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
   let marriage_source = get_str (E.marriage_source conf base) in
-  let are_divorced = get_bool E.are_divorced in
-  let are_separated = get_bool E.are_separated in
-  let are_married = get_bool E.are_married in
-  let are_engaged = get_bool E.are_engaged in
-  let are_not_married = get_bool E.are_not_married in
-  let is_no_mention = get_bool E.is_no_mention in
-  let is_no_sexes_check = get_bool E.is_no_sexes_check in
   let ifam = get_int E.ifam in
   let witnesses =
     try lazy_array (get_n_mk_person conf base) (E.witnesses fcd)
     with Not_found -> Tnull
   in
   let origin_file = Tlazy (lazy (get_str (E.origin_file conf base))) in
-  Tpat (function
-      | "are_divorced" -> are_divorced
-      | "are_married" -> are_married
-      | "are_engaged" -> are_engaged
-      | "are_not_married" -> are_not_married
-      | "are_separated" -> are_separated
-      | "divorce_date" -> divorce_date
-      | "children" -> children
-      | "father" -> father
-      | "ifam" -> ifam
-      | "is_no_mention" -> is_no_mention
-      | "is_no_sexes_check" -> is_no_sexes_check
-      | "marriage_date" -> marriage_date
-      | "marriage_place" -> marriage_place
-      | "marriage_note" -> marriage_note
-      | "marriage_source" -> marriage_source
-      | "mother" -> mother
-      | "origin_file" -> origin_file
-      | "spouse" -> spouse
-      | "witnesses" -> witnesses
-      | _ -> raise Not_found
-    )
+  Tpat begin function
+    | "divorce_date" -> divorce_date
+    | "children" -> children
+    | "father" -> father
+    | "ifam" -> ifam
+    | "marriage_date" -> marriage_date
+    | "marriage_place" -> marriage_place
+    | "marriage_note" -> marriage_note
+    | "marriage_source" -> marriage_source
+    | "mother" -> mother
+    | "origin_file" -> origin_file
+    | "spouse" -> spouse
+    | "witnesses" -> witnesses
+    | _ -> raise Not_found
+  end
 
 and get_n_mk_family conf base ?(origin = Adef.iper_of_int (-1)) ifam cpl =
   let ifath = Gwdb.get_father cpl in
@@ -478,7 +463,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   in
   let iper' = Gwdb.get_key_index p in
   let access = get_str (E.access conf base) in
-  let age = get mk_dmy (E.age conf) in
   let baptism_date = mk_opt mk_date (E.baptism_date p) in
   let baptism_place = get_str (E.baptism_place conf base) in
   let birth_date = mk_opt mk_date (E.birth_date p) in
@@ -562,7 +546,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   Tpat
     (function
       | "access" -> access
-      | "age" -> age
       | "baptism_date" -> baptism_date
       | "baptism_place" -> baptism_place
       | "birth_date" -> birth_date

@@ -464,62 +464,6 @@ module Person = struct
       end
     | _ -> raise Not_found
 
-  let on_cremation_date conf p =
-    match get_burial p with
-      Cremated cod ->
-      begin match Adef.od_of_cdate cod with
-        | Some d ->
-          begin match p_getenv conf.base_env "long_date" with
-              Some "yes" ->
-              Date.string_of_ondate conf d ^ Date.get_wday conf d
-            | _ -> Date.string_of_ondate conf d
-          end
-        | _ -> ""
-      end
-    | _ -> raise Not_found
-
-  let slash_cremation_date conf p =
-    match get_burial p with
-    | Cremated cod ->
-      begin match Adef.od_of_cdate cod with
-        | Some d -> Date.string_slash_of_date conf d
-        | _ -> ""
-      end
-    | _ -> raise Not_found
-
-  let on_death_date conf p =
-    match get_death p with
-    | Death (_, d) ->
-      let d = Adef.date_of_cdate d in
-      begin match p_getenv conf.base_env "long_date" with
-          Some "yes" -> Date.string_of_ondate conf d ^ Date.get_wday conf d
-        | _ -> Date.string_of_ondate conf d
-      end
-    | _ -> ""
-
-  let slash_death_date conf p =
-    match get_death p with
-    | Death (_, d) ->
-      Date.string_slash_of_date conf (Adef.date_of_cdate d)
-    | _ -> ""
-
-  let slash_approx_death_date conf base p =
-    match fst (Util.get_approx_death_date_place conf base p) with
-    | Some d -> Date.string_slash_of_date conf d
-    | _ -> ""
-
-  let prev_fam_father _p =
-    let (_, _, (ifath, _, _), _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_iper ifath)
-
-  let prev_fam_index _p =
-    let (ifam, _, _, _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_ifam ifam)
-
-  let prev_fam_mother _p =
-    let (_, _, (_, imoth, _), _) = get_env env.prev_fam in
-    string_of_int (Adef.int_of_iper imoth)
-
   let public_name base p =
     sou base (get_public_name p)
 
@@ -536,21 +480,6 @@ module Person = struct
 
   let sosa conf base env r p =
     get_sosa conf base env r p
-
-  let sosa_in_list p =
-    let all_gp = get_env env.all_gp in
-    match Perso.get_link all_gp (get_key_index p) with
-      Some (Perso.GP_person (s, _, _)) -> Sosa.to_string s
-    | _ -> ""
-
-  let sosa_link conf base p =
-    let x = get_env env.sosa in
-    match get_sosa conf base env x p with
-    | Some (n, q) ->
-      Printf.sprintf "m=RL;i1=%d;i2=%d;b1=1;b2=%s"
-        (Adef.int_of_iper (get_key_index p))
-        (Adef.int_of_iper (get_key_index q)) (Sosa.to_string n)
-    | None -> ""
 
   let source conf base p =
     let s = get_env env.src in
@@ -617,128 +546,7 @@ module Person = struct
 
 end
 
-module Date = struct
-
-  let prec conf = function
-    | Dgreg (dmy, _) -> Date.prec_text conf dmy
-    | _ ->  ""
-
-  let day = function
-    | Dgreg (dmy, _) when dmy.day <> 0 -> string_of_int dmy.day
-    | _ -> ""
-
-  let day2 = function
-    | Dgreg (dmy, _) ->
-      begin match dmy.prec with
-        | (OrYear dmy2 | YearInt dmy2) when dmy2.day2 <> 0 ->
-          string_of_int dmy2.day2
-        | _ ->  ""
-      end
-    | _ -> ""
-
-  let julian_day = function
-    | Dgreg (dmy, _) -> string_of_int (Calendar.sdn_of_julian dmy)
-    | _ -> ""
-
-  let month = function
-    | Dgreg (dmy, _) -> Date.month_text dmy
-    | _ -> ""
-
-  let month2 = function
-    | Dgreg (dmy, _) ->
-      begin match dmy.prec with
-        | (OrYear dmy2 | YearInt dmy2) when dmy2.month2 <> 0 ->
-          string_of_int dmy2.month2
-        | _ -> ""
-      end
-    | _ -> ""
-
-  let year = function
-    | Dgreg (dmy, _) -> string_of_int dmy.year
-    | _ -> ""
-
-  let year2 = function
-    | Dgreg (dmy, _) ->
-      begin match dmy.prec with
-        | (OrYear dmy2 | YearInt dmy2) -> string_of_int dmy2.year2
-        | _ -> ""
-      end
-    | _ -> ""
-
-  let date conf d =
-    Date.string_of_date_sep conf "<br/>" d
-
-end
-
-type rel_ = (int * relation_type * iper * bool)
-
-module Related = struct
-
-  let type_ conf (i, rt, _, is_relation) =
-    if is_relation then relation_type_text conf rt i
-    else rchild_type_text conf rt i
-
-  let iper (_, _, ip, _) = ip
-
-end
-
-module Relation = struct
-
-  let has_relation_her = function
-    | ({ r_moth = Some _ ; _}, None) -> true
-    | _ -> false
-
-  let has_relation_him = function
-    | ({ r_fath = Some _ ; _}, None) -> true
-    | _ -> false
-
-  let related : _ -> rel_ = function
-    | ({ r_type = rt ; _ }, Some p) ->
-      (index_of_sex (get_sex p), rt, get_key_index p, false)
-    | _ -> raise Not_found
-
-  let related_type conf = function
-    | (r, Some c) ->
-      rchild_type_text conf r.r_type (index_of_sex (get_sex c))
-    | _ -> raise Not_found
-
-  let relation_type conf = function
-    | (r, None) ->
-      begin match r.r_fath, r.r_moth with
-          Some _, None -> relation_type_text conf r.r_type 0
-        | None, Some _ -> relation_type_text conf r.r_type 1
-        | Some _, Some _ -> relation_type_text conf r.r_type 2
-        | _ -> raise Not_found
-      end
-    | _ -> raise Not_found
-
-  let relation_her = function
-    |  ({r_moth = Some ip; r_type = rt ; _}, None) ->  (1, rt, ip, true)
-    | _ -> raise Not_found
-
-  let relation_him = function
-    | ({r_fath = Some ip; r_type = rt ; _}, None) -> (0, rt, ip, true)
-    | _ -> raise Not_found
-
-end
-
 module Family = struct
-
-  let are_divorced (_, fam, _, _) =
-    match get_divorce fam with Divorced _ -> true | _ -> false
-
-  let are_engaged (_, fam, _, _) =
-    get_relation fam = Engaged
-
-  let are_married (_, fam, _, _) =
-    get_relation fam = Married || get_relation fam = NoSexesCheckMarried
-
-  let are_not_married (_, fam, _, _) =
-    get_relation fam = NotMarried ||
-    get_relation fam = NoSexesCheckNotMarried
-
-  let are_separated (_, fam, _, _) =
-    get_divorce fam = Separated
 
   let children (_, fam, _, _) = get_children fam
 
@@ -747,29 +555,18 @@ module Family = struct
     let (_, flevt) = Lazy.force levt in
     string_of_int flevt.(Adef.int_of_ifam ifam)
 
-  let divorce_date conf (_, fam, _, m_auth) =
-    match get_divorce fam with
-    | Divorced d ->
-      begin match Adef.od_of_cdate d with
-        | Some d when m_auth && p_getenv conf.base_env "long_date" = Some "yes" ->
-          Date2.string_of_ondate conf d ^ Date2.get_wday conf d
-        | Some d when m_auth -> Date2.string_of_ondate conf d
-        | _ -> ""
-      end
-    | _ -> raise Not_found
+  let divorce_date (_, fam, _, m_auth) =
+    if m_auth then match get_divorce fam with
+      | Divorced d -> Adef.od_of_cdate d
+      | _ -> None
+    else
+      None
 
   let father (_, _, (ifath, _, _), _) =
     if env.f_link = None then ifath else raise Not_found
 
   let ifam (ifam, _, _, _) =
     Adef.int_of_ifam ifam
-
-  let is_no_mention (_, fam, _, _) =
-    get_relation fam = NoMention
-
-  let is_no_sexes_check (_, fam, _, _) =
-    get_relation fam = NoSexesCheckNotMarried ||
-    get_relation fam = NoSexesCheckMarried
 
   let marriage_date (_, fam, (_, _, _), m_auth) =
     if m_auth then Adef.od_of_cdate (get_marriage fam) else None
