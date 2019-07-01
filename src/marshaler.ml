@@ -114,5 +114,7 @@ let () =
     in
     if !fname = "" then compile_dir !verbose !ext !dir env
     else marshal !verbose env !fname
-  with _ -> Printexc.print_backtrace stdout
-
+  with e ->
+    prerr_endline @@ Printexc.to_string e ;
+    Printexc.print_backtrace stdout ;
+    exit 1
