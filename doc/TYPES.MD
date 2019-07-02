@@ -42,25 +42,18 @@ type 'a mandatory
 
 ```
 type family =
-  { are_divorced : bool
-  ; are_married : bool
-  ; are_engaged : bool
-  ; are_not_married : bool
-  ; are_separated : bool
-  ; divorce_date : str
+  { divorce_date : date
   ; children : person list
   ; father : person
-  ; has_witnesses : bool
   ; ifam : int mandatory
-  ; is_no_mention : bool
-  ; is_no_sexes_check : bool
   ; marriage_date : date
   ; marriage_place : str
   ; marriage_note : str
   ; marriage_source : str
   ; mother : person
-  ; on_marriage_date : str
   ; origin_file : str
+  ; relation : str
+  ; separation : str
   ; spouse : person
   ; witnesses : person list
   }
@@ -74,27 +67,28 @@ A few notes about the field of `family` structure:
 - When the `family` is fetch from the field of a parent, `spouse` field
   is set to the other parent of this family.
   i.e. `mom.families[0].spouse = mom.families[0].father`.
+- `relation` is `null`, `"MARRIED"`, `"NOT_MARRIED"`, `"ENGAGED"`,
+  `"NO_SEXES_CHECK_NOT_MARRIED"`, `"NO_SEXES_CHECK_MARRIED"`, `"MARRIAGE_BANN"`,
+  `"MARRIAGE_CONTRACT"`, `"MARRIAGE_LICENSE"`, `"PACS"` or `"RESIDENCE"`
+- `separation` is `null`, `"DIVORCED"` or `"SEPARATED"`
 
 ### Person
 
 ```
 type person =
   { access : str
-  ; age : dmy
+  ; baptism_date : date
   ; baptism_place : str
-  ; birth_place : str
+  ; birth_date : date
+  ; birth_place -> str
   ; burial : burial
   ; burial_place : str
   ; children : person list
-  ; cop : str
   ; cremation_place : str
   ; consanguinity : float
-  ; date : str
   ; dates : str
   ; death : death
-  ; death_age : str
   ; death_place : str
-  ; died : str
   ; digest : str
   ; events : event list
   ; families : family list
@@ -103,43 +97,22 @@ type person =
   ; first_name_aliases : str list
   ; first_name_key : str
   ; first_name_key_val : str
-  ; has_children : bool
-  ; has_event : bool
-  ; has_image : bool
-  ; has_parents : bool
-  ; has_relations : bool
-  ; has_siblings : bool
   ; image_url : str
   ; iper : int mandatory
   ; is_birthday : bool
-  ; is_buried : bool
-  ; is_certainly_dead : bool
-  ; is_computable_age : bool
-  ; is_computable_death_age : bool
-  ; is_cremated : bool
-  ; is_dead : bool
-  ; is_invisible : bool
-  ; is_male : bool
-  ; is_female : bool
-  ; is_restricted : bool
   ; linked_page : (str -> str) func
   ; max_ancestor_level : int
   ; mother : person
   ; nb_families : int
-  ; nobility_titles : title list
   ; occ : int
   ; occupation : str
-  ; on_baptism_date : str
-  ; on_birth_date : str
-  ; on_burial_date : str
-  ; on_cremation_date : str
-  ; on_death_date : str
   ; public_name : str
   ; qualifier : str
   ; qualifiers : str list
   ; relations : relation list
   ; related : relation list
   ; sex : int
+  ; siblings : person list
   ; source_baptism : str
   ; source_birth : str
   ; source_burial : str
@@ -147,43 +120,47 @@ type person =
   ; source_fsource : str
   ; source_marriage : str
   ; source_psources : str
-  ; static_max_ancestor_level : int
+  ; spouses : person list
   ; surname : str
   ; surname_aliases : str list
   ; surname_key : str
   ; surame_key_val : str
-  ; title : int
+  ; titles : title list
   ; __str__ : str
   }
 ```
 
 ```
-type title
-(** Not implemented yet  *)
-
+type title =
+  { ident : str
+  ; name : str
+  ; place : str
+  ; date_start : date
+  ; date_end : date
+  ; nth : int
+  }
 ```
 
 ### Date/dmy
 
+A `date` is either a `date_` or a `textual_date`
+
 ```
-type date =
+type date_ =
   { calendar : str
   ; d2 : date
   ; day : int
   ; month : int
   ; prec : str
-  ; string_of_age : str
-  ; string_of_date_sep : (str -> str) func
-  ; string_of_ondate : str
   ; year : int
   ; __compare__ : (date -> date -> int) func
   ; __eq__ : (date -> date -> bool) func
   }
-(**
-   - [calendar] can be: ["Dgregorian"], ["Djulian"], ["Dfrench"] or ["Dhebrew"]
-   - [prec] can be: ["sure"], ["about"], ["maybe"], ["before"], ["after"], ["oryear"] or ["yearint"]
-*)
 ```
+
+- `calendar` can be: `"Dgregorian"`, `"Djulian"`, `"Dfrench"` or `"Dhebrew"`
+- `prec` can be: `"sure"`, `"about"`, `"maybe"`, `"before"`, `"after"`, `"oryear"` or `"yearint"`
+
 
 ```
 type dmy =
@@ -194,6 +171,19 @@ type dmy =
   }
 ```
 
+```
+type textual_date =
+  { __str__ : str
+  ; __compare__ : date -> date -> int
+  ; __eq__ : date -> date -> bool
+  ; __Dtext__ : bool
+ }
+```
+
+Textual dates are considered as equal with any other value when
+using `__compare__` function. Use `__eq__` function in order to test equality.
+It has a `__Dtext__` marker set to true.
+
 ### Death/Burial
 
 ```
@@ -202,9 +192,6 @@ type burial =
   ; date : date
   }
 ```
-
-A `burial` is either the string `"UnknownBurial"`
-or a `burial` object.
 
 ```
 type death =
@@ -232,24 +219,7 @@ type event =
   }
 ```
 
-```
-type witness
-```
 A `witness` is a `person` with an extra `kind : str` field.
-
-## Relation
-
-```
-type relation =
-  { has_relation_her : bool
-  ; has_relation_him : bool
-  ; related : person
-  ; related_type : string
-  ; relation_type : string
-  ; relation_her : bool
-  ; relation_him : bool
-  }
-```
 
 ## Conf
 
