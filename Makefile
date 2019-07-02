@@ -43,16 +43,3 @@ clean:
 	dune clean
 
 .PHONY: clean
-
-launch:
-	OCAMLRUNPARAM=b \
-	_build/default/src/gwd.exe \
-	$(DEV) \
-	-p 2318 \
-	-add_lexicon geneanet_utf8.txt \
-	-bd /home/`whoami`/workspace/bases/ \
-	-hd /home/`whoami`/workspace/geneanet.git/geneweb/gw_plus/gw \
-	-td /home/`whoami`/workspace/geneanet.git/geneweb/gw_plus/gw/etc
-
-launch-dev:
-	DEV="--dev" make launch
