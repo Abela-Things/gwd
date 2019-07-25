@@ -388,6 +388,15 @@ let handler =
   ; fallback = begin fun mode -> fun self conf base ->
       match mode with
 
+      | "API_PRINT_EXPORT" ->
+        Api_app.print_export conf base
+
+      | "API_PRINT_EXPORT_SEARCH" ->
+        Api_app.print_export_search conf base
+
+      | "API_PRINT_SYNCHRO" ->
+        Api_app.print_synchro_patch_mobile conf base
+
       | "SANDBOX" ->
         restricted_wizard
           (fun _self conf base ->

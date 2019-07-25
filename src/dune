@@ -1,5 +1,12 @@
 (ocamllex lexicon_parser)
 
+(rule
+ (deps api_app.proto)
+ (targets api_app_piqi.ml api_app_piqi_ext.ml)
+ (action (progn
+           (run piqi of-proto --normalize api_app.proto)
+           (run piqic-ocaml --ext api_app.proto.piqi))))
+
 (library
   (public_name gwxjg)
   (wrapped false)
@@ -18,8 +25,8 @@
   (package gwd)
   (name gwd)
   (public_name gwd)
-  (libraries gwxjg marshaler_lib geneweb jingoo)
-  (modules gwd handler interp)
+  (libraries gwxjg marshaler_lib geneweb jingoo piqirun.ext)
+  (modules api_app_piqi api_app_piqi_ext api_app gwd handler interp)
 )
 
 (executable

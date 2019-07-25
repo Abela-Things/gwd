@@ -2,16 +2,16 @@
 
 .DEFAULT_GOAL = build
 
-build:
+build: piqi
 	dune build src/gwd.exe src/marshaler.exe
 
-test:
+test: piqi
 	dune build @runtest
 
-bench:
+bench: piqi
 	dune build @runbench
 
 clean:
 	dune clean
 
-.PHONY: clean
+.PHONY: clean piqi
