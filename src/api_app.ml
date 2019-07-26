@@ -11,7 +11,7 @@ module App_date_converter = Api_util.Date_converter (M)
 module NameSort =
   Set.Make
     (struct
-      type t = iper * string * string * string * Def.date option
+      type t = int * string * string * string * Def.date option
       let compare (i1, sn1, fn1, _, d1) (i2, sn2, fn2, _, d2) =
         if sn1 = sn2 then
           if fn1 = fn2 then
@@ -33,8 +33,6 @@ module IntSet =
       type t = int
       let compare x y = compare !intSetTab.(x) !intSetTab.(y)
     end)
-
-let int_of_iper x = int_of_string @@ Gwdb.string_of_iper x
 
 (*
    Fichier base_info :
@@ -60,9 +58,11 @@ let print_export_info conf export_directory =
     let sosa_ref =
       match Util.find_sosa_ref conf base with
       | Some p ->
-        ( output_char oc '\001'
-        ; int_of_iper @@ get_iper p)
-      | None -> (output_char oc '\000'; 0)
+        output_char oc '\001';
+        Obj.magic @@ get_iper p
+      | None ->
+        output_char oc '\000';
+        0
     in
     output_binary_int oc sosa_ref;
     let timestamp = string_of_float (Unix.time ()) in
@@ -395,26 +395,28 @@ let print_export_person conf export_directory =
     with Sys_error _ -> (None, None)
   with
   | (Some oc_inx, Some oc_dat) ->
-    let curr = ref 0 in
-    (* offset delete *)
-    output_binary_int oc_dat 0;
-    Gwdb.Collection.iter begin fun p ->
-      let pers_app = pers_to_piqi_app_person conf base p in
-      let data = Mext.gen_person pers_app in
-      let data = data `pb in
-      (* Longueur de la personne puis données de la personne *)
-      output_binary_int oc_dat (String.length data);
-      output_string oc_dat data;
-      (* Adresse de la personne *)
-      output_binary_int oc_inx !curr;
-      (* Attention a ne pas oublier offset delete => +4 *)
-      curr := !curr + 4 + String.length data;
-    end (Gwdb.persons base) ;
-    (* mise à jour de offset delete maintenant qu'on a fini *)
-    seek_out oc_dat 0;
-    output_binary_int oc_dat !curr;
-    close_out oc_dat;
-    close_out oc_inx;
+      let curr = ref 0 in
+      (* offset delete *)
+      output_binary_int oc_dat 0;
+      for i = 0 to nb_of_persons base - 1 do
+        let ip : Gwdb.iper = Obj.magic i in
+        let p = poi base ip in
+        let pers_app = pers_to_piqi_app_person conf base p in
+        let data = Mext.gen_person pers_app in
+        let data = data `pb in
+        (* Longueur de la personne puis données de la personne *)
+        output_binary_int oc_dat (String.length data);
+        output_string oc_dat data;
+        (* Adresse de la personne *)
+        output_binary_int oc_inx !curr;
+        (* Attention a ne pas oublier offset delete => +4 *)
+        curr := !curr + 4 + String.length data;
+      done;
+      (* mise à jour de offset delete maintenant qu'on a fini *)
+      seek_out oc_dat 0;
+      output_binary_int oc_dat !curr;
+      close_out oc_dat;
+      close_out oc_inx;
   | _ -> ()
 
 (*
@@ -432,7 +434,6 @@ let print_export_family conf export_directory =
     | None -> failwith "fork base"
   in
   let base = fork_base in
-
   let fname_inx = Filename.concat export_directory "pb_base_family.inx" in
   let fname_dat = Filename.concat export_directory "pb_base_family.dat" in
   match
@@ -443,7 +444,8 @@ let print_export_family conf export_directory =
     let curr = ref 0 in
     (* offset delete *)
     output_binary_int oc_dat 0;
-    Gwdb.Collection.iter begin fun ifam ->
+    for i = 0 to nb_of_families base - 1 do
+      let ifam : ifam = Obj.magic i in
       let fam_app = fam_to_piqi_app_family base ifam in
       let data = Mext.gen_family fam_app in
       let data = data `pb in
@@ -454,7 +456,7 @@ let print_export_family conf export_directory =
       output_binary_int oc_inx !curr;
       (* Attention a ne pas oublier offset delete => +4 *)
       curr := !curr + 4 + String.length data;
-    end (Gwdb.ifams base) ;
+    done;
     (* mise à jour de offset delete maintenant qu'on a fini *)
     seek_out oc_dat 0;
     output_binary_int oc_dat !curr;
@@ -477,7 +479,6 @@ let print_person_note conf export_directory =
     | None -> failwith "fork base"
   in
   let base = fork_base in
-
   let fname_inx = Filename.concat export_directory "pb_base_person_note.inx" in
   let fname_dat = Filename.concat export_directory "pb_base_person_note.dat" in
   match
@@ -489,7 +490,9 @@ let print_person_note conf export_directory =
     let curr = ref 4 in
     (* note vide *)
     output_binary_int oc_dat 0;
-    Gwdb.Collection.iter begin fun p ->
+    for i = 0 to nb_of_persons base - 1 do
+      let ip : iper = Obj.magic i in
+      let p = poi base ip in
       let data = sou base (get_notes p) in
       if data = "" then
         (* On pointe vers la note vide. *)
@@ -502,7 +505,7 @@ let print_person_note conf export_directory =
           output_string oc_dat data;
           curr := !curr + 4 + String.length data;
         end;
-    end (Gwdb.persons base) ;
+    done;
     close_out oc_dat;
     close_out oc_inx;
   | _ -> ()
@@ -522,7 +525,6 @@ let print_family_note conf export_directory =
     | None -> failwith "fork base"
   in
   let base = fork_base in
-
   let fname_inx = Filename.concat export_directory "pb_base_family_note.inx" in
   let fname_dat = Filename.concat export_directory "pb_base_family_note.dat" in
   match
@@ -534,7 +536,9 @@ let print_family_note conf export_directory =
     let curr = ref 4 in
     (* note vide *)
     output_binary_int oc_dat 0;
-    Gwdb.Collection.iter begin fun fam ->
+    for i = 0 to nb_of_families base - 1 do
+      let ifam : ifam = Obj.magic i in
+      let fam = foi base ifam in
       let data = sou base (get_comment fam) in
       if data = "" then
         (* On pointe vers la note vide. *)
@@ -547,7 +551,7 @@ let print_family_note conf export_directory =
           output_string oc_dat data;
           curr := !curr + 4 + String.length data;
         end;
-    end (Gwdb.families base) ;
+    done;
     close_out oc_dat;
     close_out oc_inx;
   | _ -> ()
@@ -608,14 +612,15 @@ let print_ascends_index conf export_directory =
     | None -> failwith "fork base"
   in
   let base = fork_base in
-
   let fname_inx = Filename.concat export_directory "pb_base_ascends.inx" in
   match
     try Some (open_out_bin fname_inx)
     with Sys_error _ -> None
   with
   | Some oc ->
-    Gwdb.Collection.iter begin fun p ->
+    for i = 0 to nb_of_persons base - 1 do
+      let ip : iper = Obj.magic i in
+      let p = poi base ip in
       match get_parents p with
       | Some ifam ->
         begin
@@ -623,8 +628,8 @@ let print_ascends_index conf export_directory =
           let father = get_father cpl in
           let mother = get_mother cpl in
           output_char oc '\001';
-          output_binary_int oc (int_of_iper father);
-          output_binary_int oc (int_of_iper mother);
+          output_binary_int oc (Obj.magic father);
+          output_binary_int oc (Obj.magic mother);
         end
       | None ->
         begin
@@ -632,7 +637,7 @@ let print_ascends_index conf export_directory =
           output_binary_int oc 0;
           output_binary_int oc 0;
         end
-    end (Gwdb.persons base);
+    done;
     close_out oc;
   | _ -> ()
 
@@ -651,7 +656,6 @@ let print_index_search conf export_directory =
   (* avec Hashtbl *)
   (*
   let ht = Hashtbl.create 5003 in
-
   let add_to_map k v =
     Hashtbl.add ht k v
   in
@@ -672,8 +676,8 @@ let print_index_search conf export_directory =
 
   begin
     try
-      Gwdb.Collection.iter begin fun p ->
-        let i = get_iper p in
+      for i = 0 to nb_of_persons base - 1 do
+        let p = poi base (Obj.magic i) in
         let fn = sou base (get_first_name p) in
         let sn = sou base (get_surname p) in
         if sn = "?" && fn = "?" then ()
@@ -695,7 +699,7 @@ let print_index_search conf export_directory =
             Util.rev_iter (fun fn -> add_to_map fn i) (String.split_on_char ' ' fn);
             Util.rev_iter (fun n -> add_to_map n i) (String.split_on_char ' ' r);
           end
-      end (Gwdb.persons base) ;
+      done;
 
       intSetTab := Array.make (nb_of_persons base) 0;
       let nb_tab = ref 0 in
@@ -703,9 +707,9 @@ let print_index_search conf export_directory =
       let oc_name_inx = open_out_bin fname_inx in
       List.iter
         (fun (i, _, _, _, _) ->
-           output_binary_int oc_name_inx @@ int_of_iper i;
+           output_binary_int oc_name_inx i;
            incr nb_tab;
-           Array.set !intSetTab (int_of_iper i) !nb_tab)
+           Array.set !intSetTab i !nb_tab)
         (NameSort.elements !list_inx);
       close_out oc_name_inx;
 
@@ -731,8 +735,7 @@ let print_index_search conf export_directory =
              IntSet.elements
                (List.fold_left
                   (fun accu i -> IntSet.add i accu)
-                  IntSet.empty
-                  (List.map (fun x -> int_of_iper x) v))
+                  IntSet.empty v)
            in
            output_binary_int oc_name_i (List.length vv);
            List.iter (output_binary_int oc_name_i) vv;
@@ -751,23 +754,17 @@ let print_index_search conf export_directory =
           incr i;
           (* On tri la liste pour avoir afficher les résultats triés *)
           if k = !last_key then vv := IntSet.add v !vv else ();
-
           if k <> !last_key || len = !i then
             begin
               output_binary_int oc_name_wi !offset_w;
               output_binary_int oc_name_w (String.length !last_key);
               output_string oc_name_w !last_key;
               output_binary_int oc_name_w !offset_i;
-
               offset_w := !offset_w + 4 + (String.length !last_key) + 4;
-
               output_binary_int oc_name_i (IntSet.cardinal !vv);
               IntSet.iter (output_binary_int oc_name_i) !vv;
-
               offset_i := !offset_i + 4 + (4 * (IntSet.cardinal !vv));
-
               vv := IntSet.empty;
-
             end)
         ht;
       *)
@@ -785,9 +782,7 @@ let print_export conf base =
   let () = load_couples_array base in
   let () = load_unions_array base in
   let () = load_descends_array base in
-
   let () = Api_util.load_image_ht conf in
-
   (*
      On créé X processus pour l'export :
        - 1/ info
@@ -876,7 +871,6 @@ let input_synchro bname =
   with _ -> {synch_list = []}
 
 let full_synchro conf synchro timestamp =
-
   let last_import = ref None in
   let bdir =
     if Filename.check_suffix conf.bname ".gwb" then conf.bname
@@ -1026,15 +1020,17 @@ let print_synchro_patch_mobile conf base =
             match Util.find_sosa_ref conf base with
             | Some p ->
               output_char oc '\001';
-              int_of_iper (get_iper p)
-            | None -> (output_char oc '\000'; 0)
+              Obj.magic (get_iper p)
+            | None ->
+              output_char oc '\000';
+              0
           in
           output_binary_int oc sosa_ref;
           (* nb pers modified, id len pers *)
           output_binary_int oc len_ip_list;
           List.iter
             (fun i ->
-               let ip = Gwdb.iper_of_string @@ string_of_int i in
+               let ip = Obj.magic i in
                let p = poi base ip in
                let pers_app = pers_to_piqi_app_person conf base p in
                let data = Mext.gen_person pers_app in
@@ -1061,7 +1057,7 @@ let print_synchro_patch_mobile conf base =
           output_binary_int oc len_ip_list;
           List.iter
             (fun i ->
-               let ip = Gwdb.iper_of_string @@ string_of_int i in
+               let ip = Obj.magic i in
                let p = poi base ip in
                let data = sou base (get_notes p) in
                if data = "" then
@@ -1103,7 +1099,7 @@ let print_synchro_patch_mobile conf base =
           output_binary_int oc len_ip_list;
           List.iter
             (fun i ->
-               let ip = Gwdb.iper_of_string @@ string_of_int i in
+               let ip = Obj.magic i in
                let p = poi base ip in
                output_binary_int oc i;
                match get_parents p with
@@ -1113,8 +1109,8 @@ let print_synchro_patch_mobile conf base =
                    let father = get_father cpl in
                    let mother = get_mother cpl in
                    output_char oc '\001';
-                   output_binary_int oc (int_of_iper father);
-                   output_binary_int oc (int_of_iper mother);
+                   output_binary_int oc (Obj.magic father);
+                   output_binary_int oc (Obj.magic mother);
                  end
                | None ->
                  begin
@@ -1131,7 +1127,7 @@ let print_synchro_patch_mobile conf base =
           (* id nb_word len_word word *)
           List.iter
             (fun i ->
-               let ip = Gwdb.iper_of_string @@ string_of_int i in
+               let ip = Obj.magic i in
                let p = poi base ip in
                let fn = sou base (get_first_name p) in
                let sn = sou base (get_surname p) in
