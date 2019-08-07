@@ -1,6 +1,6 @@
 syntax = "proto2" ;
 
-package geneweb.api.app.object;
+package Geneanet.Geneweb.Api.Proto.App.Model;
 
 enum Calendar {
   GREGORIAN = 0;
