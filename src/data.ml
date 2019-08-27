@@ -1276,6 +1276,13 @@ let json_encode o =
 
 let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tvalue x ; Tnull
 
+let alphabetic =
+  func_arg2_no_kw begin fun a b ->
+    let a = unbox_string a in
+    let b = unbox_string b in
+    Tint (Gutil.alphabetic a b)
+  end
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf base in
   (* FIXME: remove this *)
@@ -1300,6 +1307,7 @@ let default_env conf base (* p *) =
   :: ("json_encode", func_arg1_no_kw (fun x -> Tstr (json_encode x) ))
   :: ("base", mk_base base)
   :: ("conf", conf_env)
+  :: ("alphabetic", alphabetic)
   :: ("TWIG", twig)
   :: ("LOG", log)
   :: []
