@@ -555,6 +555,12 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_marriage conf base p)
   in
   let source_psources = get_str @@ E.source_psources base in
+  let sosa = box_lazy @@ lazy begin
+      let s = Perso.get_sosa_person p in
+      if s = Sosa.zero then Tnull
+      else Tstr (Sosa.to_string s)
+    end
+  in
   let str__ =
     box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
@@ -610,6 +616,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "source_fsource" -> source_fsource
       | "source_marriage" -> source_marriage
       | "source_psources" -> source_psources
+      | "sosa" -> sosa
       | "spouses" -> spouses
       | "surname" -> surname
       | "surname_aliases" -> surname_aliases
@@ -923,13 +930,10 @@ let mk_conf conf base =
   let lang = Tstr conf.lang in
   let default_lang = Tstr conf.default_lang in
   let default_sosa_ref =
-    let (iper, _p) = conf.default_sosa_ref in
-    let person =
-      if iper = Gwdb.dummy_iper then Tnull
-      else Tlazy (lazy (get_n_mk_person conf base iper) )
-    in
-    Tobj [ ( "iper", Tstr (Gwdb.string_of_iper iper))
-         ; ( "person", person ) ] in
+    match Util.find_sosa_ref conf base with
+    | Some p -> Tlazy (lazy (unsafe_mk_person conf base p) )
+    | None -> Tnull
+  in
   let multi_parents = Tbool conf.multi_parents in
   let can_send_image = Tbool conf.can_send_image in
   let authorized_wizards_notes = Tbool conf.authorized_wizards_notes in
