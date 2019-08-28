@@ -965,176 +965,48 @@ let module_OPT =
 
 
 let mk_conf conf base =
-  let _commd_no_params = Tnull in (* FIXME *)
-  let link_to_referer = Tstr (Hutil.link_to_referer conf) in (* TO BE REMOVED? *)
-  let from = Tstr conf.Config.from in
-  let api_host = Tstr conf.api_host in
-  let api_port = Tint conf.api_port in
-  let manitou = Tbool conf.manitou in
-  let supervisor = Tbool conf.supervisor in
-  let wizard = Tvolatile (fun () -> Tbool conf.wizard) in
-  let is_printed_by_template = Tbool conf.is_printed_by_template in
-  let friend = Tbool conf.friend in
-  let just_friend_wizard = Tbool conf.just_friend_wizard in
-  let user = Tstr conf.user in
-  let username = Tstr conf.username in
-  let auth_scheme = Tnull (* auth_scheme : auth_scheme_kind; *) in
-  let pure_xhtml = Tbool conf.pure_xhtml in
-  let command = Tstr conf.command in
-  let indep_command = Tstr conf.indep_command in
-  let highlight = Tstr conf.highlight in
-  let lang = Tstr conf.lang in
-  let default_lang = Tstr conf.default_lang in
-  let default_sosa_ref =
-    match Util.find_sosa_ref conf base with
-    | Some p -> Tlazy (lazy (unsafe_mk_person conf base p) )
-    | None -> Tnull
-  in
-  let multi_parents = Tbool conf.multi_parents in
-  let can_send_image = Tbool conf.can_send_image in
-  let authorized_wizards_notes = Tbool conf.authorized_wizards_notes in
-  let public_if_titles = Tbool conf.public_if_titles in
-  let public_if_no_date = Tbool conf.public_if_no_date in
-  let setup_link = Tvolatile (fun () -> Tbool conf.setup_link) in
-  let accessByKey = Tbool conf.access_by_key in
-  let private_years = Tint conf.private_years in
-  let hide_names = Tbool conf.hide_names in
-  let use_restrict = Tbool conf.use_restrict in
-  let no_image = Tbool conf.no_image in
-  let no_note = Tbool conf.no_note in
+  let open Config in
+  let benv = Tpat (fun x -> Tstr (List.assoc x conf.base_env) ) in
   let bname = Tstr conf.bname in
-  let cgi_passwd = Tstr conf.cgi_passwd in
-  let env = Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.env) in
-  let senv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.senv))) in
-  let henv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.henv))) in
-  let benv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env))) in
-  let allowed_titles =
-    Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.allowed_titles) ) ) )
-  in
-  let denied_titles =
-    Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.denied_titles) ) ) )
-  in
-  let xhs = Tstr conf.xhs in
-  let request = Tlist (List.map (fun x -> Tstr x) conf.request) in
-  let lexicon = Tpat (fun s -> Tstr (Hashtbl.find conf.lexicon s) ) in
-  let charset = Tvolatile (fun () -> Tstr conf.charset) in
-  let is_rtl = Tbool conf.is_rtl in
-  let left = Tstr conf.left in
-  let right = Tstr conf.right in
-  let auth_file = Tstr conf.auth_file in
   let border = Tint conf.border in
-  let n_connect = Tnull (* FIXME *) in
-  let today = mk_dmy conf.today in
-  let todayWd = Tint conf.today_wd in
-  let time = mk_time conf.time in
-  let ctime = Tfloat conf.ctime in
+  let command = Tstr conf.command in
+  let env = Tpat (fun x -> Tstr (Wserver.decode @@ List.assoc x conf.env) ) in
+  let friend = Tbool conf.friend in
+  let henv = Tpat (fun x -> Tstr (List.assoc x conf.henv) ) in
   let image_prefix = Tstr "https://gw.geneanet.org/images/"(* conf.image_prefix *) in
-  let bArgForBasename = Tbool conf.b_arg_for_basename in
-  Tpat (function
-      | "access_by_key" -> accessByKey
-      | "allowed_titles" -> allowed_titles
-      | "api_host" -> api_host
-      | "api_port" -> api_port
-      | "auth_file" -> auth_file
-      | "auth_scheme" -> auth_scheme
-      | "authorized_wizards_notes" -> authorized_wizards_notes
-      | "b_arg_for_basename" -> bArgForBasename
-      | "benv" -> benv
-      | "bname" -> bname
-      | "border" -> border
-      | "can_send_image" -> can_send_image
-      | "cgi_passwd" -> cgi_passwd
-      | "charset" -> charset
-      | "command" -> command
-      | "ctime" -> ctime
-      | "default_lang" -> default_lang
-      | "default_sosa_ref" -> default_sosa_ref
-      | "denied_titles" -> denied_titles
-      | "env" -> env
-      | "friend" -> friend
-      | "from" -> from
-      | "henv" -> henv
-      | "hide_names" -> hide_names
-      | "highlight" -> highlight
-      | "image_prefix" -> image_prefix
-      | "indep_command" -> indep_command
-      | "is_printed_by_template" -> is_printed_by_template
-      | "is_rtl" -> is_rtl
-      | "just_friend_wizard" -> just_friend_wizard
-      | "lang" -> lang
-      | "left" -> left
-      | "lexicon" -> lexicon
-      | "link_to_referer" -> link_to_referer
-      | "manitou" -> manitou
-      | "multi_parents" -> multi_parents
-      | "n_connect" -> n_connect
-      | "no_image" -> no_image
-      | "no_note" -> no_note
-      | "private_years" -> private_years
-      | "public_if_no_date" -> public_if_no_date
-      | "public_if_titles" -> public_if_titles
-      | "pure_xhtml" -> pure_xhtml
-      | "request" -> request
-      | "right" -> right
-      | "senv" -> senv
-      | "setup_link" -> setup_link
-      | "supervisor" -> supervisor
-      | "time" -> time
-      | "today" -> today
-      | "today_wd" -> todayWd
-      | "use_restrict" -> use_restrict
-      | "user" -> user
-      | "username" -> username
-      | "wizard" -> wizard
-      | "xhs" -> xhs
-      | _ -> raise Not_found
-    )
-
-let mk_env conf =
-  (* FIXME browsing_with_sosa_ref *)
-  let doctype = Tstr (Util.doctype conf) in
-  let get = Tpat (fun x -> Tstr (List.assoc x conf.env)) in
-  let highlight = Tstr (conf.Config.highlight) in
-  let image_prefix = Tstr (Util.image_prefix conf) in
+  let manitou = Tbool conf.manitou in
+  let multi_parents = Tbool conf.multi_parents in
+  let no_image = Tbool conf.no_image in
   let prefix = Tstr (Util.commd conf) in
   let prefix_base = Tstr (Util.prefix_base conf) in
-  let prefix_no_iz =
-    let henv =
-      List.fold_left (fun accu k -> List.remove_assoc k accu) conf.henv
-        ["iz"; "nz"; "pz"; "ocz"]
-    in
-    Tstr (Util.commd {conf with henv = henv})
+  let senv = Tpat (fun x -> Tstr (List.assoc x conf.senv) ) in
+  let sosa_ref =
+    Tlazy begin lazy begin
+      Opt.map_default Tnull (unsafe_mk_person conf base) (Util.find_sosa_ref conf base)
+    end end
   in
-  let referer = Tstr (Util.get_referer conf) in
-  let version = Tstr Version.txt in
-  let wo_henv_senv =
-    let l =
-      List.fold_left
-        (fun accu (k, _) -> List.remove_assoc k accu)
-        (List.fold_left
-           (fun accu (k, _) -> List.remove_assoc k accu)
-           conf.env
-           conf.henv)
-        conf.senv
-    in
-    fun s -> Tstr (List.fold_left (fun c (k, v) -> c ^ k ^ "=" ^ v ^ "&") s l)
-  in
-  let suffix = wo_henv_senv "" in
-  let url = wo_henv_senv (Util.commd conf) in
-  Tpat (function
-      | "doctype" -> doctype
-      | "get" -> get
-      | "highlight" -> highlight
-      | "image_prefix" -> image_prefix
-      | "prefix" -> prefix
-      | "prefix_base" -> prefix_base
-      | "prefix_no_iz" -> prefix_no_iz
-      | "referer" -> referer
-      | "suffix" -> suffix
-      | "url" -> url
-      | "version" -> version
-      | x -> Tstr (Wserver.decode @@ List.assoc x conf.env)
-    )
+  let today = mk_dmy conf.today in
+  let wizard = Tvolatile (fun () -> Tbool conf.wizard) in
+  Tpat begin function
+    | "benv" -> benv
+    | "bname" -> bname
+    | "border" -> border
+    | "command" -> command
+    | "env" -> env
+    | "friend" -> friend
+    | "henv" -> henv
+    | "image_prefix" -> image_prefix
+    | "manitou" -> manitou
+    | "multi_parents" -> multi_parents
+    | "no_image" -> no_image
+    | "prefix" -> prefix
+    | "prefix_base" -> prefix_base
+    | "senv" -> senv
+    | "sosa_ref" -> sosa_ref
+    | "today" -> today
+    | "wizard" -> wizard
+    | _ -> raise Not_found
+  end
 
 let decode_varenv =
   func_arg1_no_kw @@ fun str ->
@@ -1339,16 +1211,8 @@ let alphabetic =
     Tint (Gutil.alphabetic a b)
   end
 
-let default_env conf base (* p *) =
+let default_env conf base =
   let conf_env = mk_conf conf base in
-  (* FIXME: remove this *)
-  (* let initCache = Tfun (fun ?kwargs:_ args -> match args with
-   *     | [ p ; Tint nb_asc ; Tint from_gen_desc ; Tint nb_desc ] ->
-   *       Geneweb.Perso_link.init_cache
-   *         conf base (Gwdb.get_key_index p) nb_asc from_gen_desc nb_desc ;
-   *       Tnull
-   *     | _ -> assert false)
-   * in *)
   let evar = mk_evar conf in
   ("trans", trans conf)
   :: ("trans_a_of_b", trans_a_of_b conf)
@@ -1356,9 +1220,7 @@ let default_env conf base (* p *) =
   :: ("OPT", module_OPT)
   :: ("CONST", module_CONST)
   :: ("GET_PERSON", get_person conf base)
-  :: ("env", mk_env conf)
   :: ("evar", evar)
-  (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
   :: ("code_varenv", code_varenv)
   :: ("json_encode", func_arg1_no_kw (fun x -> Tstr (json_encode x) ))
