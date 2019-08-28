@@ -6,6 +6,62 @@ let person_ht = Hashtbl.create 32
 
 let mk_opt fn = function None -> Tnull | Some x -> fn x
 
+module CONST = struct
+
+  let _Killed = Tstr "Killed"
+  let _Murdered = Tstr "Murdered"
+  let _Executed = Tstr "Executed"
+  let _Disappeared = Tstr "Disappeared"
+  let _Unspecified = Tstr "Unspecified"
+
+  let _DeadYoung = Tstr "DeadYoung"
+  let _DeadDontKnowWhen = Tstr "DeadDontKnowWhen"
+  let _DontKnowIfDead = Tstr "DontKnowIfDead"
+  let _OfCourseDead = Tstr "OfCourseDead"
+
+  let _Married = Tstr "MARRIED"
+  let _NotMarried = Tstr "NOT_MARRIED"
+  let _Engaged = Tstr "ENGAGED"
+  let _NoSexesCheckNotMarried = Tstr "NO_SEXES_CHECK_NOT_MARRIED"
+  let _NoSexesCheckMarried = Tstr "NO_SEXES_CHECK_MARRIED"
+  let _MarriageBann = Tstr "MARRIAGE_BANN"
+  let _MarriageContract = Tstr "MARRIAGE_CONTRACT"
+  let _MarriageLicense = Tstr "MARRIAGE_LICENSE"
+  let _Pacs = Tstr "PACS"
+  let _Residence = Tstr "RESIDENCE"
+
+  let _Divorced = Tstr "DIVORCED"
+  let _Separated = Tstr "SEPARATED"
+
+end
+
+let module_CONST =
+  let open CONST in
+  Tpat begin function
+    | "Killed" -> _Killed
+    | "Murdered" -> _Murdered
+    | "Executed" -> _Executed
+    | "Disappeared" -> _Disappeared
+    | "Unspecified" -> _Unspecified
+    | "DeadYoung" -> _DeadYoung
+    | "DeadDontKnowWhen" -> _DeadDontKnowWhen
+    | "DontKnowIfDead" -> _DontKnowIfDead
+    | "OfCourseDead" -> _OfCourseDead
+    | "Married" -> _Married
+    | "NotMarried" -> _NotMarried
+    | "Engaged" -> _Engaged
+    | "NoSexesCheckNotMarried" ->_NoSexesCheckNotMarried
+    | "NoSexesCheckMarried" -> _NoSexesCheckMarried
+    | "MarriageBann" -> _MarriageBann
+    | "MarriageContract" -> _MarriageContract
+    | "MarriageLicense" -> _MarriageLicense
+    | "Pacs" -> _Pacs
+    | "Residence" -> _Residence
+    | "Divorced" -> _Divorced
+    | "Separated" -> _Separated
+    | _ -> raise Not_found
+  end
+
 let rec date_compare_aux date1 date2 =
   let y1 = field date1 "year" in
   let y2 = field date2 "year" in
@@ -88,21 +144,21 @@ let rec mk_family (conf : Config.config) base ((_, fam, _, _) as fcd) =
   end
 
 and mk_fam_relation = function
-  | Married -> Tstr "MARRIED"
-  | NotMarried -> Tstr "NOT_MARRIED"
-  | Engaged -> Tstr "ENGAGED"
-  | NoSexesCheckNotMarried -> Tstr "NO_SEXES_CHECK_NOT_MARRIED"
+  | Married -> CONST._Married
+  | NotMarried -> CONST._NotMarried
+  | Engaged -> CONST._Engaged
+  | NoSexesCheckNotMarried -> CONST._NoSexesCheckNotMarried
   | NoMention -> Tnull
-  | NoSexesCheckMarried -> Tstr "NO_SEXES_CHECK_MARRIED"
-  | MarriageBann -> Tstr "MARRIAGE_BANN"
-  | MarriageContract -> Tstr "MARRIAGE_CONTRACT"
-  | MarriageLicense -> Tstr "MARRIAGE_LICENSE"
-  | Pacs -> Tstr "PACS"
-  | Residence -> Tstr "RESIDENCE"
+  | NoSexesCheckMarried -> CONST._NoSexesCheckMarried
+  | MarriageBann -> CONST._MarriageBann
+  | MarriageContract -> CONST._MarriageContract
+  | MarriageLicense -> CONST._MarriageLicense
+  | Pacs -> CONST._Pacs
+  | Residence -> CONST._Residence
 
 and mk_fam_separation = function
-  | Divorced _ -> Tstr "DIVORCED"
-  | Separated -> Tstr "SEPARATED"
+  | Divorced _ -> CONST._Divorced
+  | Separated -> CONST._Separated
   | NotDivorced -> Tnull
 
 and get_n_mk_family conf base ?(origin = Gwdb.dummy_iper) ifam cpl =
@@ -692,14 +748,14 @@ and mk_gen_title base t =
                | _ -> raise Not_found)
 
 and mk_death_reason = function
-  | Def.Killed -> Tstr "Killed"
-  | Murdered -> Tstr "Murdered"
-  | Executed -> Tstr "Executed"
-  | Disappeared -> Tstr "Disappeared"
-  | Unspecified -> Tstr "Unspecified"
+  | Def.Killed -> CONST._Killed
+  | Murdered -> CONST._Murdered
+  | Executed -> CONST._Executed
+  | Disappeared -> CONST._Disappeared
+  | Unspecified -> CONST._Unspecified
 
 and mk_death =
-  let wrap s = Tpat (function "death_reason" -> Tstr s | _ -> raise Not_found) in
+  let wrap x = Tpat (function "death_reason" -> x | _ -> raise Not_found) in
   function
   | Def.NotDead -> Tnull
   | Death (r, cd) ->
@@ -708,10 +764,10 @@ and mk_death =
     Tpat (function "death_reason" -> death_reason
                  | "date" -> date
                  | _ -> raise Not_found)
-  | DeadYoung -> wrap "DeadYoung"
-  | DeadDontKnowWhen -> wrap "DeadDontKnowWhen"
-  | DontKnowIfDead -> wrap "DontKnowIfDead"
-  | OfCourseDead -> wrap "OfCourseDead"
+  | DeadYoung -> wrap CONST._DeadYoung
+  | DeadDontKnowWhen -> wrap CONST._DeadDontKnowWhen
+  | DontKnowIfDead -> wrap CONST._DontKnowIfDead
+  | OfCourseDead -> wrap CONST._OfCourseDead
 
 and mk_burial = function
   | Def.UnknownBurial -> Tnull
@@ -1298,6 +1354,7 @@ let default_env conf base (* p *) =
   :: ("trans_a_of_b", trans_a_of_b conf)
   :: ("DATE", module_date conf)
   :: ("OPT", module_OPT)
+  :: ("CONST", module_CONST)
   :: ("GET_PERSON", get_person conf base)
   :: ("env", mk_env conf)
   :: ("evar", evar)
