@@ -139,9 +139,6 @@ module Person = struct
   let cremation_place conf base p =
     Util.string_of_place conf (sou base (get_burial_place p))
 
-  let dates conf base p =
-    DateDisplay.short_dates_text conf base p
-
   let death p =
     get_death p
 

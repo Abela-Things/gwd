@@ -548,7 +548,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let children = lazy_list (get_n_mk_person conf base) (E.children base p) in
   let consanguinity = get_float (E.consanguinity) in
   let cremation_place = get_str (E.cremation_place conf base) in
-  let dates = get_str (E.dates conf base) in
   let death = get mk_death E.death in
   let death_place = get_str (E.death_place conf base) in
   let digest = Tlazy (lazy (get_str (E.digest base) ) ) in
@@ -617,71 +616,64 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       else Tstr (Sosa.to_string s)
     end
   in
-  let str__ =
-    box_lazy @@
-    lazy (get_str (Util.person_text conf base)) (* FIXME *)
-  in
   let surname_key_val = get_str (E.surname_key_val base) in
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
-  Tpat
-    (function
-      | "access" -> access
-      | "baptism_date" -> baptism_date
-      | "baptism_place" -> baptism_place
-      | "birth_date" -> birth_date
-      | "birth_place" -> birth_place
-      | "burial" -> burial
-      | "burial_place" -> burial_place
-      | "children" -> children
-      | "cremation_place" -> cremation_place
-      | "consanguinity" -> consanguinity
-      | "dates" -> dates
-      | "death" -> death
-      | "death_place" -> death_place
-      | "digest" -> digest
-      | "events" -> events
-      | "families" -> families
-      | "father" -> father
-      | "first_name" -> first_name
-      | "first_name_aliases" -> first_name_aliases
-      | "first_name_key" -> first_name_key
-      | "first_name_key_val" -> first_name_key_val
-      | "half_siblings" -> half_siblings
-      | "image_url" -> image_url
-      | "iper" -> iper
-      | "is_birthday" -> is_birthday
-      | "linked_page" -> linked_page
-      | "max_ancestor_level" -> max_ancestor_level
-      | "mother" -> mother
-      | "nb_families" -> nb_families
-      | "occ" -> occ
-      | "occupation" -> occupation
-      | "public_name" -> public_name
-      | "qualifier" -> qualifier
-      | "qualifiers" -> qualifiers
-      | "relations" -> relations
-      | "related" -> related
-      | "sex" -> sex
-      | "siblings" -> siblings
-      | "source_baptism" -> source_baptism
-      | "source_birth" -> source_birth
-      | "source_burial" -> source_burial
-      | "source_death" -> source_death
-      | "source_fsource" -> source_fsource
-      | "source_marriage" -> source_marriage
-      | "source_psources" -> source_psources
-      | "sosa" -> sosa
-      | "spouses" -> spouses
-      | "surname" -> surname
-      | "surname_aliases" -> surname_aliases
-      | "surname_key" -> surname_key
-      | "surname_key_val" -> surname_key_val
-      | "titles" -> titles
-      | "__str__" -> str__
-      | _ -> raise Not_found
-    )
+  Tpat begin function
+    | "access" -> access
+    | "baptism_date" -> baptism_date
+    | "baptism_place" -> baptism_place
+    | "birth_date" -> birth_date
+    | "birth_place" -> birth_place
+    | "burial" -> burial
+    | "burial_place" -> burial_place
+    | "children" -> children
+    | "cremation_place" -> cremation_place
+    | "consanguinity" -> consanguinity
+    | "death" -> death
+    | "death_place" -> death_place
+    | "digest" -> digest
+    | "events" -> events
+    | "families" -> families
+    | "father" -> father
+    | "first_name" -> first_name
+    | "first_name_aliases" -> first_name_aliases
+    | "first_name_key" -> first_name_key
+    | "first_name_key_val" -> first_name_key_val
+    | "half_siblings" -> half_siblings
+    | "image_url" -> image_url
+    | "iper" -> iper
+    | "is_birthday" -> is_birthday
+    | "linked_page" -> linked_page
+    | "max_ancestor_level" -> max_ancestor_level
+    | "mother" -> mother
+    | "nb_families" -> nb_families
+    | "occ" -> occ
+    | "occupation" -> occupation
+    | "public_name" -> public_name
+    | "qualifier" -> qualifier
+    | "qualifiers" -> qualifiers
+    | "relations" -> relations
+    | "related" -> related
+    | "sex" -> sex
+    | "siblings" -> siblings
+    | "source_baptism" -> source_baptism
+    | "source_birth" -> source_birth
+    | "source_burial" -> source_burial
+    | "source_death" -> source_death
+    | "source_fsource" -> source_fsource
+    | "source_marriage" -> source_marriage
+    | "source_psources" -> source_psources
+    | "sosa" -> sosa
+    | "spouses" -> spouses
+    | "surname" -> surname
+    | "surname_aliases" -> surname_aliases
+    | "surname_key" -> surname_key
+    | "surname_key_val" -> surname_key_val
+    | "titles" -> titles
+    | _ -> raise Not_found
+  end
 
 (* FIXME *)
 and mk_source _s =
