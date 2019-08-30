@@ -46,6 +46,75 @@ let birth_death_aux conf base fn bool =
   let () = clear_persons_array base in
   list
 
+let print_surname_aux conf base not_found sn (list, inj) =
+  let () = Perso.build_sosa_ht conf base in
+  let data =
+    match Util.p_getenv conf.env "o" with
+    | Some "i" ->
+      let list =
+        Some.ipers list
+        |> Util.filter_map begin fun i ->
+          let p = Util.pget conf base i in
+          if not (Util.is_hide_names conf p) || Util.authorized_age conf base p
+          then Some (Data.unsafe_mk_person conf base p)
+          else None
+        end
+      in
+      [ "list", Tlist list ]
+    | _ -> match Some.branches conf base inj (Some.ipers list) with
+      | [] -> not_found conf sn ; raise Not_found
+      | branches ->
+        let branches =
+          match Util.p_getenv conf.env "br" with
+          | Some "" | None -> branches
+          | Some i -> [ List.nth branches (int_of_string i - 1) ]
+        in
+        let branches =
+          List.map begin fun { Some.bh_ancestor ; bh_well_named_ancestors } ->
+            let a = Data.unsafe_mk_person conf base bh_ancestor in
+            let wna = Tlist (List.map (Data.unsafe_mk_person conf base) bh_well_named_ancestors) in
+            Tpat begin function
+              | "ancestor" -> a
+              | "well_named_ancestors" -> wna
+              | _ -> raise Not_found
+            end
+          end branches
+        in
+        [ "branches", Tlist branches ]
+  in
+  let surname = Tstr sn in
+  let test =
+    let sn_list = List.map Name.lower (Util.split_sname_ss sn) in
+    let match_surname s =
+      let list = Util.split_sname_ss s |> List.map Name.lower in
+      List.for_all (fun s -> List.mem s sn_list) list
+    in
+    func_arg1_no_kw begin fun x -> Tbool (match_surname (unbox_string x)) end
+  in
+  let models =
+    ("DATA", Tobj ( ("test", test) :: ("surname", surname) :: data))
+    :: Data.default_env conf base
+  in
+  Interp.render ~conf ~file:"sn" ~models
+
+let print_first_name_aux conf base fn list =
+  let fn = Mutil.split_fname fn in
+  let list =
+    Some.ipers list
+    |> Util.filter_map begin fun i ->
+      let p = Util.pget conf base i in
+      if not (Util.is_hide_names conf p) || Util.authorized_age conf base p
+      then Some (Data.unsafe_mk_person conf base p)
+      else None
+    end
+  in
+  let models =
+    ("DATA", Tobj [ ("first_names", Tlist (List.map box_string fn) )
+                  ; ("persons", Tlist list) ] )
+    :: Data.default_env conf base
+  in
+  Interp.render ~conf ~file:"fn" ~models
+
 let handler =
   let open RequestHandler in
   { defaultHandler with
@@ -293,6 +362,14 @@ let handler =
           Interp.render ~conf ~file:"mrg_ind" ~models:( ("error", Tbool true) :: Data.default_env conf base )
       end
 
+  ; n = begin fun _self conf base ->
+      match Util.p_getenv conf.env "v" with
+      | Some v ->
+        Some.search_surnames base v
+        |> print_surname_aux conf base SomeDisplay.surname_not_found v
+      | _ -> Alln.print_surnames conf base
+    end
+
   ; notes = begin fun self conf base ->
       let fnotes =
         match Util.p_getenv conf.env "f" with
@@ -363,6 +440,14 @@ let handler =
       Interp.render ~conf ~file:"oe" ~models
     end
 
+  ; p = begin fun _self conf base ->
+      match Util.p_getenv conf.env "v" with
+      | Some v ->
+        let list = Some.search_first_names base v in
+        print_first_name_aux conf base v list
+      | _ -> Alln.print_surnames conf base
+    end
+
   ; pop_pyr = begin fun _self conf base ->
       let interval = max 1 (Opt.default 5 @@ Util.p_getint conf.env "int") in
       let limit = Opt.default 0 @@ Util.p_getint conf.env "lim" in
@@ -383,6 +468,26 @@ let handler =
         :: Data.default_env conf base
       in
       Interp.render ~conf ~file:"pop_pyr" ~models
+    end
+
+  ; s = begin fun _self conf base ->
+      let specify _ _ _ _ = failwith __LOC__ in
+      let aux =
+        SearchName.search conf base specify SomeDisplay.surname_not_found
+          (fun conf base p -> Perso.print conf base p)
+          print_surname_aux
+          print_first_name_aux
+      in
+      let real_input label =
+        match Util.p_getenv conf.env label with
+        | Some s -> if s = "" then None else Some s
+        | None -> None
+      in
+      match real_input "p", real_input "n" with
+      | Some fn, Some sn -> aux fn sn [ Key ; FirstName ; ApproxKey ; PartialKey ]
+      | Some fn, None -> aux fn "" [ FirstName ]
+      | None, Some sn -> aux "" sn [ Sosa ; Key ; Surname ; ApproxKey ; PartialKey ]
+      | None, None -> Hutil.incorrect_request conf
     end
 
   ; fallback = begin fun mode -> fun self conf base ->
