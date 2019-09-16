@@ -77,7 +77,7 @@ let handler =
       | None -> self.incorrect_request self conf base
       | Some i ->
         let conf = Update.update_conf conf in
-        if Util.p_getenv conf.env "return" <> None then ChangeChildren.print_update_child conf base
+        if Util.p_getenv conf.env "return" <> None then ChangeChildrenDisplay.print_update_child conf base
         else begin
           let models =
             try
