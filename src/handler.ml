@@ -268,7 +268,8 @@ let handler =
             Interp.render ~conf ~file:"mrg_ind" ~models
           in
           try
-            let (ok, wl) = Geneweb.MergeInd.merge conf base p1 p2 propose_merge_ind in
+            let propose_merge_fam = Geneweb.MergeIndDisplay.propose_merge_fam in (* FIXME *)
+            let (ok, wl) = Geneweb.MergeInd.merge conf base p1 p2 propose_merge_ind propose_merge_fam in
             if ok then
               let wl = List.map (Data.mk_warning conf base) wl in
               let models =

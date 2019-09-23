@@ -186,7 +186,7 @@ module Person = struct
   let history_file base p =
     let fn = sou base (get_first_name p) in
     let sn = sou base (get_surname p) in
-    let occ = get_occ p in History_diff.history_file fn sn occ
+    let occ = get_occ p in HistoryDiff.history_file fn sn occ
 
   let image base p =
     sou base (get_image p)
