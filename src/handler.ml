@@ -415,6 +415,21 @@ let handler =
             Interp.render ~conf ~file:"timeline" ~models
           )
 
+      | "LIST_IND" ->
+        (* FIXME: stop checking is_empty_name when possible *)
+        (* TODO sort all and create multiple pages with specified size. *)
+        (fun _self conf base -> 
+        let get_person_name p = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
+        let person_list = Gwdb.Collection.fold
+            (fun li p ->
+                if (Util.is_empty_name p) then li
+                else get_person_name p :: li) [] (Gwdb.persons base) in
+        let models = ("personlist", Tlist person_list)
+            :: Data.default_env conf base in
+        Interp.render ~conf ~file:"list_ind" ~models
+        ) self conf base
+
+
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
 
