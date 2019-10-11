@@ -421,17 +421,27 @@ let handler =
       | "LIST_IND" ->
         (* FIXME: stop checking is_empty_name when possible *)
         (* TODO sort all and create multiple pages with specified size. *)
+        (* pages are accessed with an index and display a specified number of persons. *)
         (fun _self conf base -> 
-        let get_person_name p = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
+        let rec insert_person_inplace comp li person =
+            match li with
+            | hd :: tl -> if Gutil.alphabetic (Ezgw.Person.surname base hd) (Ezgw.Person.surname base person) <= 0
+                then (person) :: hd :: tl
+                else hd :: insert_person_inplace comp tl (person)
+            | [] -> [person]
+        in
         let person_list = Gwdb.Collection.fold
-            (fun li p ->
-                if (Util.is_empty_name p) then li
-                else get_person_name p :: li) [] (Gwdb.persons base) in
-        let models = ("personlist", Tlist person_list)
-            :: Data.default_env conf base in
+          (fun li p ->
+            if (Util.is_empty_name p)
+              then li
+              else insert_person_inplace Gutil.alphabetic li p) [] (Gwdb.persons base)
+            in
+            let access_person p = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
+            let models = ("personlist", Tlist (List.fold_left (fun li p ->
+              (access_person p) :: li) [] person_list))
+          :: Data.default_env conf base in
         Interp.render ~conf ~file:"list_ind" ~models
         ) self conf base
-
 
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
