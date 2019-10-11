@@ -421,11 +421,20 @@ let handler =
         (* pages are accessed with an index and display a specified number of persons. *)
         (fun _self conf base -> 
         let rec insert_person_inplace comp li person =
-            match li with
-            | hd :: tl -> if Gutil.alphabetic (Ezgw.Person.surname base hd) (Ezgw.Person.surname base person) <= 0
-                then (person) :: hd :: tl
-                else hd :: insert_person_inplace comp tl (person)
-            | [] -> [person]
+          let compare_persons p1 p2 =
+            let res_surname =
+              Gutil.alphabetic (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
+            if res_surname != 0 then res_surname
+            else let res_firstname =
+              Gutil.alphabetic (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
+              if res_firstname != 0 then res_firstname
+              else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+          in
+          match li with 
+          | hd :: tl -> if compare_persons hd person <= 0
+              then (person) :: hd :: tl
+              else hd :: insert_person_inplace comp tl (person)
+          | [] -> [person]
         in
         let person_list = Gwdb.Collection.fold
           (fun li p ->
