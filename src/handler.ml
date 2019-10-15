@@ -203,8 +203,11 @@ let handler =
               in
               History.record conf base changed "cn";
               ("ind", Data.get_n_mk_person conf base ip) :: Data.default_env conf base
-            with ChangeChildren.FirstNameMissing _ip ->
+            with
+            | ChangeChildren.FirstNameMissing _ip ->
               ("error", Tbool true) :: Data.default_env conf base
+            | ChangeChildren.ChangeChildrenConflict (p, p') ->
+              ChangeChildrenDisplay.print_conflict conf base (get_iper p) p'
           in
           Interp.render ~conf ~file:"chg_chn_ok" ~models
         end
