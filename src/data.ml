@@ -519,6 +519,10 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let image_url = get_str (fun p -> E.image_url conf base p) in
   let iper = Tstr (Gwdb.string_of_iper iper') in
   let is_birthday = get_bool (E.is_birthday conf) in
+  let is_visible_for_visitors =
+    box_lazy @@
+    lazy (Tbool (Util.authorized_age {conf with wizard = false; friend = false} base p))
+  in
   let linked_page =
     box_lazy @@
     lazy (let fn = E.linked_page conf base p in Tpat (fun s -> Tstr (fn s) ) )
@@ -590,6 +594,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "image_url" -> image_url
       | "iper" -> iper
       | "is_birthday" -> is_birthday
+      | "is_visible_for_visitors" -> is_visible_for_visitors
       | "linked_page" -> linked_page
       | "max_ancestor_level" -> max_ancestor_level
       | "mother" -> mother
