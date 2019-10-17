@@ -1,0 +1,14 @@
+{%- include 'perso_utils.jingoo' -%}
+{%- include 'utils.jingoo' -%}
+
+<h1>Liste des individus :</h1>
+
+<h2>page num {{ page_num }}</h2>
+<h2>page size {{ page_size }}</h2>
+<ul>
+{%- for person in person_list -%}
+    <li>
+      {{ print_reference_person(person) }}
+    </li>
+{%- endfor -%}
+</ul>
