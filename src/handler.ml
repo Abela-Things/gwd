@@ -4,6 +4,16 @@ open Config
 open Jingoo
 open Jg_types
 
+let sublist l start size =
+(* FIXME: How can I raise an error here? for start < 0.
+  Should I put this in Util ? *)
+  let rec get_start l start =
+    match l with
+      _ :: tl -> if start > 0 then get_start tl (start - 1) else tl
+    | _ -> []
+  in
+  Util.reduce_list size (get_start l start)
+
 let restricted_wizard fn self conf base =
   if conf.wizard then fn self conf base
   else self.RequestHandler.incorrect_request self conf base
@@ -433,26 +443,15 @@ let handler =
               else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
           in
           match li with 
-          | hd :: tl -> if compare_persons hd person <= 0
+            hd :: tl -> if compare_persons hd person <= 0
               then (person) :: hd :: tl
               else hd :: insert_person_inplace comp tl (person)
           | [] -> [person]
         in
         let person_collection = Gwdb.Collection.fold
           (fun li p ->
-            if (Util.is_empty_name p)
-              then li
-              else insert_person_inplace Gutil.alphabetic li p) [] (Gwdb.persons base)
-        in
-        let sublist l start size =
-        (* FIXME: How can I raise an error here? for start < 0.
-          Should I put this in Util ? *)
-          let rec get_start l start =
-            match l with
-              _ :: tl -> if start > 0 then get_start tl (start - 1) else tl
-            | _ -> []
-          in
-          Util.reduce_list size (get_start l start)
+            if (Util.is_empty_name p) then li
+            else insert_person_inplace Gutil.alphabetic li p) [] (Gwdb.persons base)
         in
         let access_person p = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
         let page_num = Opt.default 0 @@ Util.p_getint conf.env "pg" in
