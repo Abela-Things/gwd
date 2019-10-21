@@ -1,6 +1,5 @@
 (* /!\ This is mostly copy/paste of the Perso module /!\ *)
 (* Sync with perso from ed7525bac *)
-
 open Geneweb
 
 module MLink = Api_link_tree_piqi
@@ -548,6 +547,22 @@ module Family = struct
 
   let witnesses (_, fam, _, m_auth) =
     if m_auth then get_witnesses fam else raise Not_found
+
+  let events (_, fam, (_, _, isp), m_auth) =
+    if m_auth
+    then
+      List.fold_right
+        (fun evt fam_fevents ->
+           let name = Perso.Fevent evt.efam_name in
+           let date = evt.efam_date in
+           let place = evt.efam_place in
+           let note = evt.efam_note in
+           let src = evt.efam_src in
+           let wl = evt.efam_witnesses in
+           let x = name, date, place, note, src, wl, Some isp in
+           x :: fam_fevents)
+        (get_fevents fam) []
+    else raise Not_found
 
 end
 
