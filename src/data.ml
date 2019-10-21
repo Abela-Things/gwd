@@ -57,6 +57,7 @@ let rec mk_family (conf : Config.config) base ((_, fam, _, _) as fcd) =
     else Tnull
   in
   let children = lazy_array (get_n_mk_person conf base) (E.children fcd) in
+  let events = lazy_list (mk_event conf base) (E.events fcd) in
   let marriage_date = mk_opt mk_date (E.marriage_date fcd) in
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
@@ -73,6 +74,7 @@ let rec mk_family (conf : Config.config) base ((_, fam, _, _) as fcd) =
     | "divorce_date" -> divorce_date
     | "children" -> children
     | "father" -> father
+    | "events" -> events
     | "ifam" -> ifam
     | "marriage_date" -> marriage_date
     | "marriage_place" -> marriage_place
