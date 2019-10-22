@@ -580,7 +580,7 @@ module Event = struct
   let src base (_, _, _, _, s, _, _) =
     sou base s
 
-  let kind base (n, _, _, _, _, _, _) =
+  let kind (n, _, _, _, _, _, _) =
     match n with
     | Geneweb.Perso.Pevent Epers_Birth -> "EPERS_BIRTH"
     | Pevent Epers_Baptism -> "EPERS_BAPTISM"
@@ -644,8 +644,8 @@ module Event = struct
     | Fevent Efam_MarriageLicense -> "EFAM_MARRIAGE_LICENSE"
     | Fevent Efam_PACS -> "EFAM_PACS"
     | Fevent Efam_Residence -> "EFAM_RESIDENCE"
-    | Pevent Epers_Name s -> sou base s
-    | Fevent Efam_Name s -> sou base s
+    | Pevent Epers_Name _ -> ""
+    | Fevent Efam_Name _ -> ""
 
   let name conf base (n, _, _, _, _, _, _) =
     match n with

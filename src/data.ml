@@ -356,7 +356,7 @@ and mk_event conf base d =
     | None -> Tnull
     | Some i -> lazy_get_n_mk_person conf base i
   in
-  let kind = Tstr (E.kind base d) in
+  let kind = Tstr (E.kind d) in
   let witnesses =
     match E.witnesses d with
     | [||] -> Tarray [||]
