@@ -291,13 +291,13 @@ and pget conf base ip =
   let open Def in
   let open Gwdb in
   if ip = dummy_iper
-  then Tpat (fun _ -> Tnull)
+  then unsafe_mk_person conf base (Gwdb.empty_person base ip)
   else
     let p = poi base ip in
     if not (Util.authorized_age conf base p)
     then
       if conf.use_restrict
-      then Tpat (fun _ -> Tnull)
+      then unsafe_mk_person conf base (Gwdb.empty_person base ip)
       else if conf.hide_names || get_access p = Private
       then
         let lazy_p = lazy (unbox_pat @@ unsafe_mk_semi_public_person conf base p) in
