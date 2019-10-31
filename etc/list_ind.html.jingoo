@@ -5,6 +5,7 @@
 
 <h2>page num {{ page_num }}</h2>
 <h2>page size {{ page_size }}</h2>
+<h2>page count {{ page_count }} </h2>
 <ul>
 {%- for person in person_list -%}
     <li>
