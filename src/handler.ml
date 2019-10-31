@@ -14,6 +14,70 @@ let sublist l start size =
   in
   Util.reduce_list size (get_start l start)
 
+let is_cache_iper_inorder_uptodate conf base =
+  let cache_path = (Util.base_path [] (conf.bname ^ ".gwb")) ^ "cache_iper_inorder" in
+  try
+    let cache_stat = Unix.stat (cache_path) in
+    let cache_timeof_modif = cache_stat.Unix.st_mtime in
+    let base_timeof_modif = Gwdb.date_of_last_change base in
+    (base_timeof_modif < cache_timeof_modif)
+  with
+    Unix.Unix_error _ -> false
+
+let build_cache_iper_inorder conf base =
+  let compare_persons p1 p2 =
+    let res_surname =
+      Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
+    if res_surname != 0 then res_surname
+    else let res_firstname =
+      Gutil.alphabetic_utf_8 (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
+      if res_firstname != 0 then res_firstname
+      else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+  in
+  let module PerSet = Set.Make (struct type t = person let compare = compare_persons end)
+  in
+  let sorted_person_set = Gwdb.Collection.fold
+    (fun set p ->
+      if (Util.is_empty_name p) then set
+      else PerSet.add p set
+    ) PerSet.empty (Gwdb.persons base) in
+  let sorted_person_list = PerSet.elements sorted_person_set in
+  let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
+  let rec get_first_letters_occ li plist idx =
+    (* volontarily case sensitive *)
+    let add_letter surname = 
+      let real = let _, i = Name.unaccent_utf_8 true surname 0 in String.sub surname 0 i
+      in
+      let is_present list letter = List.exists (fun (s, _) -> String.compare letter s == 0) list
+      in
+      if is_present li real then li else (real, idx) :: li
+    in
+    match plist with
+    | [] -> li
+    | hd :: tl -> get_first_letters_occ (add_letter (Ezgw.Person.surname base hd)) tl (idx + 1)
+  in
+  let person_count = PerSet.cardinal sorted_person_set in
+  let first_letters = List.rev (get_first_letters_occ [] sorted_person_list 0) in
+  let iper_list = List.map Gwdb.get_iper (PerSet.elements sorted_person_set) in
+  try
+    let oc = Secure.open_out_bin cache_filename in
+      (* memory optimizations may be necessary later. *)
+      output_value oc person_count;
+      output_value oc first_letters;    (* first_letters offset *)
+      output_value oc iper_list;
+    close_out oc
+  with Sys_error _ -> ()
+
+(*TODO give letter to read_cache to only read what is needed, and write size to cache.*)
+let read_cache_iper_inorder conf =
+  let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
+  let ic = Secure.open_in_bin cache_filename in
+  let person_count : int = input_value ic in
+  let first_letters : (string * int) list = input_value ic in
+  let iper_list : iper list = input_value ic in
+  close_in ic ;
+  person_count, first_letters, iper_list
+
 let restricted_wizard fn self conf base =
   if conf.wizard then fn self conf base
   else self.RequestHandler.incorrect_request self conf base
@@ -429,36 +493,26 @@ let handler =
         (* FIXME: stop checking is_empty_name when possible *)
         (* pages are accessed with an index 'pg' and display a specified 'sz' number of persons. *)
         (fun _self conf base -> 
-        let rec insert_person_inplace comp li person =
-          let compare_persons p1 p2 =
-            let res_surname =
-              Gutil.alphabetic (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
-            if res_surname != 0 then res_surname
-            else let res_firstname =
-              Gutil.alphabetic (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
-              if res_firstname != 0 then res_firstname
-              else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
-          in
-          match li with 
-            hd :: tl -> if compare_persons hd person <= 0
-              then (person) :: hd :: tl
-              else hd :: insert_person_inplace comp tl (person)
-          | [] -> [person]
-        in
-        let person_collection = Gwdb.Collection.fold
-          (fun li p ->
-            if (Util.is_empty_name p) then li
-            else insert_person_inplace Gutil.alphabetic li p) [] (Gwdb.persons base)
-        in
-        let access_person p = Data.get_n_mk_person conf base (Gwdb.get_iper p) in
+        let access_person iper = Data.pget conf base iper in
         let page_num = Opt.default 0 @@ Util.p_getint conf.env "pg" in
         let page_size = Opt.default 50 @@ Util.p_getint conf.env "sz" in
-        let person_list = List.fold_left (fun li p -> (access_person p) :: li) [] person_collection
+        let letter = Util.p_getenv conf.env "letter" in
+        if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base;
+        let person_count, first_letters, iper_list = read_cache_iper_inorder conf in
+        let page_count = person_count / page_size - if person_count mod page_size == 0 then 1 else 0 in
+        let iper_to_display =
+          match letter with
+          | None -> sublist iper_list (page_num * page_size) (page_size)
+          | Some letter ->
+            let (_, index) = List.find (fun (s, _) -> String.compare letter s == 0) first_letters in
+            let page_num = index / page_size in
+            sublist iper_list (page_num * page_size) (page_size)
         in
-        let person_to_display = sublist person_list (page_num * page_size) (page_size) in
+        let person_to_display = List.map (fun iper -> access_person iper) iper_to_display in
         let models = ("person_list", Tlist person_to_display)
           :: ("page_num", Tint page_num)
           :: ("page_size", Tint page_size)
+          :: ("page_count", Tint page_count)
           :: Data.default_env conf base
         in
         Interp.render ~conf ~file:"list_ind" ~models
