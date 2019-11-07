@@ -63,7 +63,7 @@ let build_cache_iper_inorder conf base =
     let oc = Secure.open_out_bin cache_filename in
       (* memory optimizations may be necessary later. *)
       output_value oc person_count;
-      output_value oc first_letters;    (* first_letters offset *)
+      output_value oc first_letters;
       output_value oc iper_list;
     close_out oc
   with Sys_error _ -> ()
@@ -500,16 +500,18 @@ let handler =
         if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base;
         let person_count, first_letters, iper_list = read_cache_iper_inorder conf in
         let page_count = person_count / page_size - if person_count mod page_size == 0 then 1 else 0 in
-        let iper_to_display =
+        let page_num, iper_to_display =
           match letter with
-          | None -> sublist iper_list (page_num * page_size) (page_size)
-          | Some letter ->
-            let (_, index) = List.find (fun (s, _) -> String.compare letter s == 0) first_letters in
-            let page_num = index / page_size in
-            sublist iper_list (page_num * page_size) (page_size)
+          | None -> page_num, sublist iper_list (page_num * page_size) (page_size)
+          | Some letter -> match List.find_opt (fun (s, _) -> String.compare letter s == 0) first_letters with
+              | None -> page_num, sublist iper_list (page_num * page_size) (page_size)
+              | Some (_, idx) -> let page_num = idx / page_size in
+                page_num, sublist iper_list (page_num * page_size) (page_size)
         in
         let person_to_display = List.map (fun iper -> access_person iper) iper_to_display in
-        let models = ("person_list", Tlist person_to_display)
+        let letter_list = List.map (fun (l, _) -> Tstr l) first_letters in
+        let models = ("letter_list", Tlist letter_list)
+          :: ("person_list", Tlist person_to_display)
           :: ("page_num", Tint page_num)
           :: ("page_size", Tint page_size)
           :: ("page_count", Tint page_count)
