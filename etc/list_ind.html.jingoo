@@ -1,11 +1,27 @@
+<html>
 {%- include 'perso_utils.jingoo' -%}
 {%- include 'utils.jingoo' -%}
+<meta charset="UTF-8">
+<link rel="stylesheet" href="https://static.geneanet.org/geneweb/style.css?version=0.30&v=20191016165759">
+<link rel="stylesheet" href="https://static.geneanet.org/geneweb/arbre.css?v=20191016165759">
+<link rel="stylesheet" href="https://geneacdn.net/css/geneweb.css?v=20191016165759">
+<link rel="stylesheet" href="https://geneacdn.net/css/geneweb_bundle.css?v=20191016165759">
+<link rel="stylesheet" href="https://geneacdn.net/css/bbb2497.css?v=20191016165759">
+<link rel="stylesheet" href="https://gw.geneanet.org/_fragment/geneweb/basename_theme_fragment/sagotchtest.css?c_version=2&cachable=1&lang=fr&route_origin=geneanet_geneweb_basename_theme_fragment_css&ttl=300&v=c2d1859fa0925ea8148ada6ed4961e2481b4d736">
+<link rel="stylesheet" href="https://geneacdn.net/css/geneweb_transition.css?v=20191016165759">
+<link rel="stylesheet" href="https://geneacdn.net/css/image_tiling.css?v=20191015151950">
+<link rel="stylesheet" href="https://geneacdn.net/css/media.css?v=20191015151950">
+<link rel="stylesheet" href="https://geneacdn.net/css/5f68e92.css?v=20191016165759">
+<link rel="stylesheet" href="https://geneacdn.net/css/guided_tour.css?v=20191016165759">
 
 <h1>Liste des individus :</h1>
 
-<h2>page num {{ page_num }}</h2>
-<h2>page size {{ page_size }}</h2>
-<h2>page count {{ page_count }} </h2>
+<div id="content">
+
+{%- for letter in letter_list -%}
+    <a href="{{env.prefix}}&m=LIST_IND&sz={{env.sz}}&letter={{letter}}"> {{letter}} </a>
+{%- endfor -%}
+
 <ul>
 {%- for person in person_list -%}
     <li>
@@ -13,3 +29,30 @@
     </li>
 {%- endfor -%}
 </ul>
+
+{%- if page_num > 0 -%}
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="LIST_IND">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="hidden" value="{{page_num - 1}}">
+  <input type="submit" value="<<">
+</form>
+{%- endif -%}
+
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="LIST_IND">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="number" min="0" max="{{page_count}}" value="{{page_num}}" style="float:left;width:auto;height:auto">
+  / {{page_count}}
+  <input type="submit">
+</form>
+
+{%- if page_num < page_count -%}
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="LIST_IND">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="hidden" value="{{page_num + 1}}">
+  <input type="submit" value=">>">
+</form>
+{%- endif -%}
+
