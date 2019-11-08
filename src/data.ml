@@ -1103,10 +1103,10 @@ let decode_varenv =
   try Tstr (Wserver.decode @@ unbox_string str)
   with _ -> failwith_type_error_1 "decode_varenv" str
 
-let code_varenv =
+let encode_varenv =
   func_arg1_no_kw @@ fun str ->
   try Tstr (Wserver.encode @@ unbox_string str)
-  with _ -> failwith_type_error_1 "decode_varenv" str
+  with _ -> failwith_type_error_1 "encode_varenv" str
 
 let mk_evar conf =
   Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
@@ -1314,7 +1314,7 @@ let default_env conf base (* p *) =
   :: ("evar", evar)
   (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
-  :: ("code_varenv", code_varenv)
+  :: ("encode_varenv", encode_varenv)
   :: ("json_encode", func_arg1_no_kw (fun x -> Tstr (json_encode x) ))
   :: ("base", mk_base base)
   :: ("conf", conf_env)
