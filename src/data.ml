@@ -209,6 +209,13 @@ and to_gregorian_aux calendar d =
   | "Dhebrew" -> Calendar.gregorian_of_hebrew d
   | _ -> assert false
 
+and of_calendar d = match Jg_runtime.jg_obj_lookup d "calendar" with
+  | Tstr "Dgregorian" -> Def.Dgregorian
+  | Tstr "Djulian" -> Def.Djulian
+  | Tstr "Dfrench" -> Def.Dfrench
+  | Tstr "Dhebrew" -> Def.Dhebrew
+  | _ -> assert false
+
 and module_date conf =
   let now =
     Tvolatile (fun () ->
@@ -230,7 +237,7 @@ and module_date conf =
     try
       let link = Opt.map_default false unbox_bool (List.assoc_opt "link" kwargs) in
       Tstr (DateDisplay.string_of_ondate { conf with cancel_links = not link } @@
-            Def.Dgreg (to_dmy d, Def.Dgregorian) )
+            Def.Dgreg (to_dmy d, of_calendar d) )
     with e ->
       if Jg_runtime.jg_obj_lookup d "__Dtext__" = Tbool true
       then Jg_runtime.jg_obj_lookup d "__str__"
