@@ -475,6 +475,13 @@ and unsafe_mk_semi_public_person conf base (p : Gwdb.person) =
       | _ -> raise Not_found
     )
 
+and get_sosa_person =
+  let loaded = ref false in
+  fun conf base p ->
+    if not !loaded then Perso.build_sosa_ht conf base ;
+    let sosa = Perso.get_sosa_person p in
+    if sosa = Sosa.zero then Tnull else Tstr (Sosa.to_string sosa)
+
 and unsafe_mk_person conf base (p : Gwdb.person) =
   let get wrap fn = try wrap (fn p) with Not_found -> Tnull in
   let get_str = get box_string in
@@ -576,6 +583,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let surname = get_str (E.surname base) in
   let surname_aliases = Tlist (List.map box_string (E.surname_aliases base p) ) in
   let surname_key = get_str (E.surname_key base) in
+  let sosa = box_lazy @@ lazy begin get_sosa_person conf base p end in
   Tpat
     (function
       | "access" -> access
@@ -617,6 +625,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "related" -> related
       | "sex" -> sex
       | "siblings" -> siblings
+      | "sosa" -> sosa
       | "source_baptism" -> source_baptism
       | "source_birth" -> source_birth
       | "source_burial" -> source_burial
@@ -915,7 +924,7 @@ let module_OPT =
   end
 
 
-let mk_conf conf base =
+let mk_conf conf =
   let _commd_no_params = Tnull in (* FIXME *)
   let link_to_referer = Tstr (Hutil.link_to_referer conf) in (* TO BE REMOVED? *)
   let from = Tstr conf.Config.from in
@@ -936,14 +945,6 @@ let mk_conf conf base =
   let highlight = Tstr conf.highlight in
   let lang = Tstr conf.lang in
   let default_lang = Tstr conf.default_lang in
-  let default_sosa_ref =
-    let (iper, _p) = conf.default_sosa_ref in
-    let person =
-      if iper = Gwdb.dummy_iper then Tnull
-      else Tlazy (lazy (get_n_mk_person conf base iper) )
-    in
-    Tobj [ ( "iper", Tstr (Gwdb.string_of_iper iper))
-         ; ( "person", person ) ] in
   let multi_parents = Tbool conf.multi_parents in
   let can_send_image = Tbool conf.can_send_image in
   let authorized_wizards_notes = Tbool conf.authorized_wizards_notes in
@@ -1002,7 +1003,6 @@ let mk_conf conf base =
       | "command" -> command
       | "ctime" -> ctime
       | "default_lang" -> default_lang
-      | "default_sosa_ref" -> default_sosa_ref
       | "denied_titles" -> denied_titles
       | "env" -> env
       | "friend" -> friend
@@ -1044,7 +1044,7 @@ let mk_conf conf base =
       | _ -> raise Not_found
     )
 
-let mk_env conf =
+let mk_env conf base =
   (* FIXME browsing_with_sosa_ref *)
   let doctype = Tstr (Util.doctype conf) in
   let get = Tpat (fun x -> Tstr (List.assoc x conf.env)) in
@@ -1075,6 +1075,13 @@ let mk_env conf =
   in
   let suffix = wo_henv_senv "" in
   let url = wo_henv_senv (Util.commd conf) in
+  let sosa_ref =
+    box_lazy @@
+    lazy begin let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in match Util.find_sosa_ref conf base with
+      | None -> let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in Tnull
+      | Some i -> let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in unsafe_mk_person conf base i
+    end
+  in
   Tpat (function
       | "doctype" -> doctype
       | "get" -> get
@@ -1084,6 +1091,7 @@ let mk_env conf =
       | "prefix_base" -> prefix_base
       | "prefix_no_iz" -> prefix_no_iz
       | "referer" -> referer
+      | "sosa_ref" -> sosa_ref
       | "suffix" -> suffix
       | "url" -> url
       | "version" -> version
@@ -1287,7 +1295,7 @@ let json_encode o =
 let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tvalue x ; Tnull
 
 let default_env conf base (* p *) =
-  let conf_env = mk_conf conf base in
+  let conf_env = mk_conf conf in
   (* FIXME: remove this *)
   (* let initCache = Tfun (fun ?kwargs:_ args -> match args with
    *     | [ p ; Tint nb_asc ; Tint from_gen_desc ; Tint nb_desc ] ->
@@ -1302,7 +1310,7 @@ let default_env conf base (* p *) =
   :: ("DATE", module_date conf)
   :: ("OPT", module_OPT)
   :: ("GET_PERSON", get_person conf base)
-  :: ("env", mk_env conf)
+  :: ("env", mk_env conf base)
   :: ("evar", evar)
   (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
