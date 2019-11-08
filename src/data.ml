@@ -1077,9 +1077,9 @@ let mk_env conf base =
   let url = wo_henv_senv (Util.commd conf) in
   let sosa_ref =
     box_lazy @@
-    lazy begin let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in match Util.find_sosa_ref conf base with
-      | None -> let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in Tnull
-      | Some i -> let () = print_endline @@ Printf.sprintf "%s:" __LOC__ in unsafe_mk_person conf base i
+    lazy begin match Util.find_sosa_ref conf base with
+      | None -> Tnull
+      | Some i -> unsafe_mk_person conf base i
     end
   in
   Tpat (function
