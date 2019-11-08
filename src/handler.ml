@@ -9,7 +9,7 @@ let sublist l start size =
   Should I put this in Util ? *)
   let rec get_start l start =
     match l with
-      _ :: tl -> if start > 0 then get_start tl (start - 1) else tl
+      _ :: tl -> if start > 0 then get_start tl (start - 1) else l
     | _ -> []
   in
   Util.reduce_list size (get_start l start)
@@ -37,20 +37,21 @@ let build_cache_iper_inorder conf base =
   let module PerSet = Set.Make (struct type t = person let compare = compare_persons end)
   in
   let sorted_person_set = Gwdb.Collection.fold
+    (* FIXME: stop checking is_empty_name when possible *)
     (fun set p ->
       if (Util.is_empty_name p) then set
       else PerSet.add p set
     ) PerSet.empty (Gwdb.persons base) in
   let sorted_person_list = PerSet.elements sorted_person_set in
-  let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
+  let cache_filename = Filename.concat
+    (Util.base_path [] conf.bname ^ ".gwb")
+    "cache_iper_inorder" in
   let rec get_first_letters_occ li plist idx =
     (* volontarily case sensitive *)
     let add_letter surname = 
       let real = let _, i = Name.unaccent_utf_8 true surname 0 in String.sub surname 0 i
       in
-      let is_present list letter = List.exists (fun (s, _) -> String.compare letter s == 0) list
-      in
-      if is_present li real then li else (real, idx) :: li
+      if List.mem_assoc real li then li else (real, idx) :: li
     in
     match plist with
     | [] -> li
@@ -490,7 +491,6 @@ let handler =
           )
 
       | "LIST_IND" ->
-        (* FIXME: stop checking is_empty_name when possible *)
         (* pages are accessed with an index 'pg' and display a specified 'sz' number of persons. *)
         (fun _self conf base -> 
         let access_person iper = Data.pget conf base iper in
@@ -509,8 +509,22 @@ let handler =
                 page_num, sublist iper_list (page_num * page_size) (page_size)
         in
         let person_to_display = List.map (fun iper -> access_person iper) iper_to_display in
+        let letter_crible =
+          let rec build_crible letters_idx idx =
+            if idx == page_size then []
+            else
+              match letters_idx with
+              | [] -> Tbool false :: build_crible letters_idx (idx + 1)
+              | (_, i) :: tl -> if i - (page_size * page_num) < 0
+                                  then build_crible tl idx
+                                else if i - (page_size * page_num) == idx
+                                  then Tbool true :: build_crible tl (idx + 1)
+                                else Tbool false :: build_crible letters_idx (idx + 1)
+          in build_crible first_letters 0
+        in
         let letter_list = List.map (fun (l, _) -> Tstr l) first_letters in
         let models = ("letter_list", Tlist letter_list)
+          :: ("letter_crible", Tlist letter_crible)
           :: ("person_list", Tlist person_to_display)
           :: ("page_num", Tint page_num)
           :: ("page_size", Tint page_size)
