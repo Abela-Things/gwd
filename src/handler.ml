@@ -166,6 +166,24 @@ let handler =
 
     _no_mode = defaultHandler._no_mode
 
+  ; as_ok = begin fun _self conf base ->
+      let max_answers = try int_of_string @@ List.assoc "max" conf.env with _ -> 100 in
+      let (list, _len) = AdvSearchOk.advanced_search conf base max_int in
+      let searching_fields =
+        let s = AdvSearchOk.searching_fields conf in
+        if String.get s (String.length s - 1) == ','
+        then String.sub s 0 (String.length s - 1)
+        else s
+      in
+      let models =
+        ("results", Tlist (List.map (Data.unsafe_mk_person conf base) list))
+        :: ("max_results", Tint max_answers)
+        :: ("searching_fields", Tstr searching_fields)
+        :: Data.default_env conf base
+      in
+      Interp.render ~conf ~file:"as_ok" ~models
+    end
+
   ; b = restricted_friend begin fun _self conf base ->
       let data = birth_death_aux conf base (fun p -> Adef.od_of_cdate (get_birth p)) false in
       let models = ("data", Tlist data) :: Data.default_env conf base in
