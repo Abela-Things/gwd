@@ -50,19 +50,23 @@ let env = empty
 
 let get_env x = match x with Some x -> x | None -> raise Not_found
 
-let mk_note conf base p note =
-  (* FIXME WTF IS THAT? *)
-  let env = ['i', (fun () -> Util.default_image_name base p)] in
+let mk_note conf base env note =
   let s = sou base note in
   let s = string_with_macros conf env s in
   let lines = Wiki.html_of_tlsw conf s in
   let wi =
-    {Wiki.wi_mode = "NOTES"; Wiki.wi_cancel_links = conf.cancel_links;
-     Wiki.wi_file_path = Notes.file_path conf base;
-     Wiki.wi_person_exists = person_exists conf base;
-     Wiki.wi_always_show_link = conf.wizard || conf.friend}
+    { Wiki.wi_mode = "NOTES"
+    ; Wiki.wi_cancel_links = conf.cancel_links
+    ; Wiki.wi_file_path = Notes.file_path conf base
+    ; Wiki.wi_person_exists = person_exists conf base
+    ; Wiki.wi_always_show_link = conf.wizard || conf.friend
+    }
   in
   Wiki.syntax_links conf wi (String.concat "\n" lines)
+
+let mk_person_note conf base p note =
+  let env = ['i', (fun () -> Util.default_image_name base p)] in
+  mk_note conf base env note
 
 let sex_of_index = function
   | 0 -> Male
@@ -108,7 +112,7 @@ module Person = struct
     Util.string_of_place conf (sou base (get_birth_place p))
 
   let birth_note conf base p =
-    mk_note conf base p (get_birth_note p)
+    mk_person_note conf base p (get_birth_note p)
 
   let baptism_date p = Adef.od_of_cdate (get_baptism p)
 
@@ -116,7 +120,7 @@ module Person = struct
     Util.string_of_place conf (sou base (get_baptism_place p))
 
   let baptism_note conf base p =
-    mk_note conf base p (get_baptism_note p)
+    mk_person_note conf base p (get_baptism_note p)
 
   let burial p =
     get_burial p
@@ -125,7 +129,7 @@ module Person = struct
     Util.string_of_place conf (sou base (get_burial_place p))
 
   let burial_note conf base p =
-    mk_note conf base p (get_burial_note p)
+    mk_person_note conf base p (get_burial_note p)
 
   let children base p = ChangeChildren.select_children_of base p
 
@@ -148,7 +152,7 @@ module Person = struct
     Util.string_of_place conf (sou base (get_death_place p))
 
   let death_note conf base p =
-    mk_note conf base p (get_death_note p)
+    mk_person_note conf base p (get_death_note p)
 
   let digest base p =
     Update.digest_person (UpdateInd.string_person_of base p)
@@ -482,75 +486,46 @@ module Family = struct
 
   let children (_, fam, _, _) = get_children fam
 
-  let divorce_date (_, fam, _, m_auth) =
-    if m_auth then match get_divorce fam with
-      | Divorced d -> Adef.od_of_cdate d
-      | _ -> None
-    else
-      None
+  let divorce_date (_, fam, _, auth) =
+    match get_divorce fam with
+    | Divorced d when auth -> Adef.od_of_cdate d
+    | _ -> None
 
   let father (_, _, (ifath, _, _), _) =
-    if env.f_link = None then ifath else raise Not_found
+    ifath
 
   let ifam (ifam, _, _, _) =
     string_of_ifam ifam
 
-  let marriage_date (_, fam, (_, _, _), m_auth) =
-    if m_auth then Adef.od_of_cdate (get_marriage fam) else None
+  let marriage_date (_, fam, (_, _, _), auth) =
+    if auth then Adef.od_of_cdate (get_marriage fam)
+    else None
 
-  (* FIXME: string_of_place was called but might not be useful here *)
-  let marriage_place base (_, fam, _, m_auth) =
-    if m_auth then sou base (get_marriage_place fam) else ""
+  let marriage_place base (_, fam, _, _) =
+    sou base (get_marriage_place fam)
 
-  (* FIXME? *)
-  let marriage_note conf base (_, fam, _, m_auth) =
-    if m_auth && not conf.no_note then
-      let s = sou base (get_marriage_note fam) in
-      let s = string_with_macros conf [] s in
-      let lines = Wiki.html_of_tlsw conf s in
-      let wi =
-        {Wiki.wi_mode = "NOTES";
-         Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      Wiki.syntax_links conf wi (String.concat "\n" lines)
+  let marriage_note conf base (_, fam, _, auth) =
+    if auth then mk_note conf base [] (get_marriage_note fam)
     else ""
 
-  let marriage_source conf base (_, fam, _, m_auth) =
-    if m_auth then
-      let s = sou base (get_marriage_src fam) in
-      let s = string_with_macros conf [] s in
-      let lines = Wiki.html_of_tlsw conf s in
-      let wi =
-        {Wiki.wi_mode = "NOTES";
-         Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      Wiki.syntax_links conf wi (String.concat "\n" lines)
+  let marriage_source base (_, fam, _, auth) =
+    if auth then sou base (get_marriage_src fam)
     else ""
 
   let mother (_, _, (_, imoth, _), _) =
-    if env.f_link = None then imoth else raise Not_found
-
-  let nb_children (_, fam, _, _) =
-    Array.length (get_children fam)
+    imoth
 
   let origin_file conf base (_, fam, _, _) =
     if conf.wizard then sou base (get_origin_file fam)
-    else raise Not_found
+    else ""
 
   let spouse_iper (_, _, (_, _, ip), _) = ip
 
-  let witnesses (_, fam, _, m_auth) =
-    if m_auth then get_witnesses fam else raise Not_found
+  let witnesses (_, fam, _, auth) =
+    if auth then get_witnesses fam else [||]
 
-  let events (_, fam, (_, _, isp), m_auth) =
-    if m_auth
-    then
+  let events (_, fam, (_, _, isp), auth) =
+    if auth then
       List.fold_right
         (fun evt fam_fevents ->
            let name = Perso.Fevent evt.efam_name in
@@ -562,7 +537,7 @@ module Family = struct
            let x = name, date, place, note, src, wl, Some isp in
            x :: fam_fevents)
         (get_fevents fam) []
-    else raise Not_found
+    else []
 
 end
 

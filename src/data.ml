@@ -2,6 +2,8 @@ open Geneweb
 open Jingoo
 open Jg_types
 
+(* FIXME: remove [try ... with Not_found -> ...] wrapping.  *)
+
 let person_ht = Hashtbl.create 32
 
 let mk_opt fn = function None -> Tnull | Some x -> fn x
@@ -61,7 +63,7 @@ let rec mk_family (conf : Config.config) base ((_, fam, _, _) as fcd) =
   let marriage_date = mk_opt mk_date (E.marriage_date fcd) in
   let marriage_place = get_str (E.marriage_place base) in
   let marriage_note = get_str (E.marriage_note conf base) in
-  let marriage_source = get_str (E.marriage_source conf base) in
+  let marriage_source = get_str (E.marriage_source base) in
   let relation = mk_fam_relation (Gwdb.get_relation fam) in
   let separation = mk_fam_separation (Gwdb.get_divorce fam) in
   let ifam = get_str E.ifam in
