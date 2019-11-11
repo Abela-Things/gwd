@@ -311,10 +311,8 @@ and pget conf base ip =
       then
         let lazy_p = lazy (unbox_pat @@ unsafe_mk_semi_public_person conf base p) in
         Tpat begin function
-          | "first_name"
-          | "first_name_aliases"
-          | "surname"
-          | "surname_aliases" -> Tnull
+          | "first_name" | "surname" -> Tstr "x"
+          | "first_name_aliases" | "surname_aliases" -> Tlist []
           | x -> (Lazy.force lazy_p) x
         end
       else unsafe_mk_semi_public_person conf base p
@@ -534,7 +532,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   in
   let first_name_key = get_str (E.first_name_key base) in
   let first_name_key_val = get_str (E.first_name_key_val base) in
-  let image_url = get_str (fun p -> E.image_url conf base p) in
   let iper = Tstr (Gwdb.string_of_iper iper') in
   let is_birthday = get_bool (E.is_birthday conf) in
   let is_visible_for_visitors =
@@ -545,9 +542,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
     box_lazy @@
     lazy (let fn = E.linked_page conf base p in Tpat (fun s -> Tstr (fn s) ) )
   in
-  let max_ancestor_level = Tlazy (lazy (get_int (E.max_ancestor_level conf base) ) ) in
   let mother = mk_parent Gwdb.get_mother in
-  let nb_families = get_int (E.nb_families conf) in
   let titles = lazy_list (mk_title base) (E.titles p) in
   let occ = get_int E.occ in
   let occupation = get_str (E.occupation conf base) in
@@ -566,17 +561,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
   let siblings_aux fn = lazy_list (get_n_mk_person conf base) (fn base p) in
   let siblings = siblings_aux E.siblings in
   let half_siblings = siblings_aux E.half_siblings in
-  let source_baptism = get_str @@ E.source_baptism base in
-  let source_birth = get_str @@ E.source_birth base in
-  let source_burial = get_str @@ E.source_burial base in
-  let source_death = get_str @@ E.source_death base in
-  let source_fsource =
-    box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_fsource conf base p)
-  in
-  let source_marriage =
-    box_lazy @@ lazy (box_array @@ Array.map box_string @@ E.source_marriage conf base p)
-  in
-  let source_psources = get_str @@ E.source_psources base in
+  let sources = get_str @@ E.psources base in
   let str__ =
     box_lazy @@
     lazy (get_str (Util.person_text conf base)) (* FIXME *)
@@ -610,14 +595,11 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "first_name_key" -> first_name_key
       | "first_name_key_val" -> first_name_key_val
       | "half_siblings" -> half_siblings
-      | "image_url" -> image_url
       | "iper" -> iper
       | "is_birthday" -> is_birthday
       | "is_visible_for_visitors" -> is_visible_for_visitors
       | "linked_page" -> linked_page
-      | "max_ancestor_level" -> max_ancestor_level
       | "mother" -> mother
-      | "nb_families" -> nb_families
       | "occ" -> occ
       | "occupation" -> occupation
       | "public_name" -> public_name
@@ -628,13 +610,7 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "sex" -> sex
       | "siblings" -> siblings
       | "sosa" -> sosa
-      | "source_baptism" -> source_baptism
-      | "source_birth" -> source_birth
-      | "source_burial" -> source_burial
-      | "source_death" -> source_death
-      | "source_fsource" -> source_fsource
-      | "source_marriage" -> source_marriage
-      | "source_psources" -> source_psources
+      | "sources" -> sources
       | "spouses" -> spouses
       | "surname" -> surname
       | "surname_aliases" -> surname_aliases
@@ -644,24 +620,6 @@ and unsafe_mk_person conf base (p : Gwdb.person) =
       | "__str__" -> str__
       | _ -> raise Not_found
     )
-
-(* FIXME *)
-and mk_source _s =
-  let source_type = Tstr "" in
-  let str__ = Tfun (fun ?kwargs:_ _ -> Tstr "") in
-  Tpat (function
-      | "source_type" -> source_type
-      | "__str__" -> str__
-      | _ -> raise Not_found
-    )
-
-and mk_time (hh, mm, ss) =
-  Tpat (function
-      | "__str__" -> Tstr (Printf.sprintf "%02d:%02d:%02d" hh mm ss)
-      | "hours" -> Tstr (Printf.sprintf "%02d" hh)
-      | "minutes" -> Tstr (Printf.sprintf "%02d" mm)
-      | "seconds" -> Tstr (Printf.sprintf "%02d" ss)
-      | _ -> raise Not_found)
 
 and mk_dmy { Def.day ; month ; year ; delta ; prec } =
   let day = Tint day in
@@ -925,180 +883,43 @@ let module_OPT =
     | _ -> raise Not_found
   end
 
-
 let mk_conf conf =
-  let _commd_no_params = Tnull in (* FIXME *)
-  let link_to_referer = Tstr (Hutil.link_to_referer conf) in (* TO BE REMOVED? *)
-  let from = Tstr conf.Config.from in
-  let api_host = Tstr conf.api_host in
-  let api_port = Tint conf.api_port in
-  let manitou = Tbool conf.manitou in
-  let supervisor = Tbool conf.supervisor in
-  let wizard = Tvolatile (fun () -> Tbool conf.wizard) in
-  let is_printed_by_template = Tbool conf.is_printed_by_template in
+  let wizard = Tvolatile (fun () -> Tbool conf.Config.wizard) in
   let friend = Tbool conf.friend in
-  let just_friend_wizard = Tbool conf.just_friend_wizard in
-  let user = Tstr conf.user in
-  let username = Tstr conf.username in
-  let auth_scheme = Tnull (* auth_scheme : auth_scheme_kind; *) in
-  let pure_xhtml = Tbool conf.pure_xhtml in
   let command = Tstr conf.command in
-  let indep_command = Tstr conf.indep_command in
-  let highlight = Tstr conf.highlight in
-  let lang = Tstr conf.lang in
-  let default_lang = Tstr conf.default_lang in
-  let multi_parents = Tbool conf.multi_parents in
-  let can_send_image = Tbool conf.can_send_image in
-  let authorized_wizards_notes = Tbool conf.authorized_wizards_notes in
-  let public_if_titles = Tbool conf.public_if_titles in
-  let public_if_no_date = Tbool conf.public_if_no_date in
-  let setup_link = Tvolatile (fun () -> Tbool conf.setup_link) in
-  let accessByKey = Tbool conf.access_by_key in
-  let private_years = Tint conf.private_years in
-  let hide_names = Tbool conf.hide_names in
-  let use_restrict = Tbool conf.use_restrict in
-  let no_image = Tbool conf.no_image in
-  let no_note = Tbool conf.no_note in
-  let bname = Tstr conf.bname in
-  let cgi_passwd = Tstr conf.cgi_passwd in
   let env = Tobj (List.map (fun (k, v) -> (k, Tstr (Wserver.decode v))) conf.env) in
   let senv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.senv))) in
   let henv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.henv))) in
   let benv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env))) in
-  let allowed_titles =
-    Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.allowed_titles) ) ) )
-  in
-  let denied_titles =
-    Tlazy (lazy (Tlist (List.map (fun x -> Tstr x) (Lazy.force conf.denied_titles) ) ) )
-  in
-  let xhs = Tstr conf.xhs in
-  let request = Tlist (List.map (fun x -> Tstr x) conf.request) in
-  let lexicon = Tpat (fun s -> Tstr (Hashtbl.find conf.lexicon s) ) in
-  let charset = Tvolatile (fun () -> Tstr conf.charset) in
-  let is_rtl = Tbool conf.is_rtl in
-  let left = Tstr conf.left in
-  let right = Tstr conf.right in
-  let auth_file = Tstr conf.auth_file in
-  let border = Tint conf.border in
-  let n_connect = Tnull (* FIXME *) in
   let today = mk_dmy conf.today in
-  let todayWd = Tint conf.today_wd in
-  let time = mk_time conf.time in
-  let ctime = Tfloat conf.ctime in
   let image_prefix = Tstr "https://gw.geneanet.org/images/"(* conf.image_prefix *) in
-  let bArgForBasename = Tbool conf.b_arg_for_basename in
-  Tpat (function
-      | "access_by_key" -> accessByKey
-      | "allowed_titles" -> allowed_titles
-      | "api_host" -> api_host
-      | "api_port" -> api_port
-      | "auth_file" -> auth_file
-      | "auth_scheme" -> auth_scheme
-      | "authorized_wizards_notes" -> authorized_wizards_notes
-      | "b_arg_for_basename" -> bArgForBasename
-      | "benv" -> benv
-      | "bname" -> bname
-      | "border" -> border
-      | "can_send_image" -> can_send_image
-      | "cgi_passwd" -> cgi_passwd
-      | "charset" -> charset
-      | "command" -> command
-      | "ctime" -> ctime
-      | "default_lang" -> default_lang
-      | "denied_titles" -> denied_titles
-      | "env" -> env
-      | "friend" -> friend
-      | "from" -> from
-      | "henv" -> henv
-      | "hide_names" -> hide_names
-      | "highlight" -> highlight
-      | "image_prefix" -> image_prefix
-      | "indep_command" -> indep_command
-      | "is_printed_by_template" -> is_printed_by_template
-      | "is_rtl" -> is_rtl
-      | "just_friend_wizard" -> just_friend_wizard
-      | "lang" -> lang
-      | "left" -> left
-      | "lexicon" -> lexicon
-      | "link_to_referer" -> link_to_referer
-      | "manitou" -> manitou
-      | "multi_parents" -> multi_parents
-      | "n_connect" -> n_connect
-      | "no_image" -> no_image
-      | "no_note" -> no_note
-      | "private_years" -> private_years
-      | "public_if_no_date" -> public_if_no_date
-      | "public_if_titles" -> public_if_titles
-      | "pure_xhtml" -> pure_xhtml
-      | "request" -> request
-      | "right" -> right
-      | "senv" -> senv
-      | "setup_link" -> setup_link
-      | "supervisor" -> supervisor
-      | "time" -> time
-      | "today" -> today
-      | "today_wd" -> todayWd
-      | "use_restrict" -> use_restrict
-      | "user" -> user
-      | "username" -> username
-      | "wizard" -> wizard
-      | "xhs" -> xhs
-      | _ -> raise Not_found
-    )
+  Tpat begin function
+    | "benv" -> benv
+    | "command" -> command
+    | "env" -> env
+    | "friend" -> friend
+    | "henv" -> henv
+    | "image_prefix" -> image_prefix
+    | "senv" -> senv
+    | "today" -> today
+    | "wizard" -> wizard
+    | _ -> raise Not_found
+  end
 
 let mk_env conf base =
   (* FIXME browsing_with_sosa_ref *)
-  let doctype = Tstr (Util.doctype conf) in
-  let get = Tpat (fun x -> Tstr (List.assoc x conf.env)) in
-  let highlight = Tstr (conf.Config.highlight) in
-  let image_prefix = Tstr (Util.image_prefix conf) in
   let prefix = Tstr (Util.commd conf) in
   let prefix_base = Tstr (Util.prefix_base conf) in
-  let prefix_no_iz =
-    let henv =
-      List.fold_left (fun accu k -> List.remove_assoc k accu) conf.henv
-        ["iz"; "nz"; "pz"; "ocz"]
-    in
-    Tstr (Util.commd {conf with henv = henv})
-  in
-  let referer = Tstr (Util.get_referer conf) in
-  let version = Tstr Version.txt in
-  let wo_henv_senv =
-    let l =
-      List.fold_left
-        (fun accu (k, _) -> List.remove_assoc k accu)
-        (List.fold_left
-           (fun accu (k, _) -> List.remove_assoc k accu)
-           conf.env
-           conf.henv)
-        conf.senv
-    in
-    fun s -> Tstr (List.fold_left (fun c (k, v) -> c ^ k ^ "=" ^ v ^ "&") s l)
-  in
-  let suffix = wo_henv_senv "" in
-  let url = wo_henv_senv (Util.commd conf) in
   let sosa_ref =
     box_lazy @@
-    lazy begin match Util.find_sosa_ref conf base with
-      | None -> Tnull
-      | Some i -> unsafe_mk_person conf base i
-    end
+    lazy (mk_opt (unsafe_mk_person conf base) (Util.find_sosa_ref conf base) )
   in
-  Tpat (function
-      | "doctype" -> doctype
-      | "get" -> get
-      | "highlight" -> highlight
-      | "image_prefix" -> image_prefix
+  Tpat begin function
       | "prefix" -> prefix
       | "prefix_base" -> prefix_base
-      | "prefix_no_iz" -> prefix_no_iz
-      | "referer" -> referer
       | "sosa_ref" -> sosa_ref
-      | "suffix" -> suffix
-      | "url" -> url
-      | "version" -> version
       | x -> Tstr (Wserver.decode @@ List.assoc x conf.env)
-    )
+  end
 
 let decode_varenv =
   func_arg1_no_kw @@ fun str ->
@@ -1110,17 +931,12 @@ let encode_varenv =
   try Tstr (Wserver.encode @@ unbox_string str)
   with _ -> failwith_type_error_1 "encode_varenv" str
 
-let mk_evar conf =
-  Tpat (fun v -> match Util.p_getenv (conf.Config.env @ conf.henv) v with
-      | Some vv -> Tstr ((* Util.escape_html *) vv)
-      | None -> Tnull)
-
 let mk_base base =
-  Tpat (function
-      | "nb_of_persons" -> Tint (Gwdb.nb_of_persons base)
-      | "nb_of_families" -> Tint (Gwdb.nb_of_families base)
-      | _ -> raise Not_found
-    )
+  Tpat begin function
+    | "nb_of_persons" -> Tint (Gwdb.nb_of_persons base)
+    | "nb_of_families" -> Tint (Gwdb.nb_of_families base)
+    | _ -> raise Not_found
+  end
 
 let stringify s =
   Printf.sprintf (if String.contains s '\'' then "\"%s\"" else "'%s'") s
@@ -1298,23 +1114,12 @@ let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tval
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf in
-  (* FIXME: remove this *)
-  (* let initCache = Tfun (fun ?kwargs:_ args -> match args with
-   *     | [ p ; Tint nb_asc ; Tint from_gen_desc ; Tint nb_desc ] ->
-   *       Geneweb.Perso_link.init_cache
-   *         conf base (Gwdb.get_key_index p) nb_asc from_gen_desc nb_desc ;
-   *       Tnull
-   *     | _ -> assert false)
-   * in *)
-  let evar = mk_evar conf in
   ("trans", trans conf)
   :: ("trans_a_of_b", trans_a_of_b conf)
   :: ("DATE", module_date conf)
   :: ("OPT", module_OPT)
   :: ("GET_PERSON", get_person conf base)
   :: ("env", mk_env conf base)
-  :: ("evar", evar)
-  (* :: ("initCache", initCache) *)
   :: ("decode_varenv", decode_varenv)
   :: ("encode_varenv", encode_varenv)
   :: ("json_encode", func_arg1_no_kw (fun x -> Tstr (json_encode x) ))
