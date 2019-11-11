@@ -79,33 +79,6 @@ module Person = struct
   let access conf base p =
     Util.acces conf base p
 
-  let age conf p =
-    match Adef.od_of_cdate (get_birth p), get_death p with
-    | Some (Dgreg (d, _)), NotDead ->
-      Date.time_elapsed d conf.today
-    | _ -> raise Not_found
-
-  let alias base p =
-    match get_aliases p with
-      nn :: _ -> sou base nn
-    | _ -> raise Not_found
-
-  let aliases base p =
-    List.map (sou base) (get_aliases p)
-
-  let approx_birth_place conf base p =
-    snd (Util.get_approx_birth_date_place conf base p)
-
-  let approx_death_place conf base p =
-    snd (Util.get_approx_death_date_place conf base p)
-
-  let auto_image_file_name conf base p =
-    match auto_image_file conf base p with
-    | Some s -> s
-    | _ -> raise Not_found
-
-  let bname_prefix conf = Util.commd conf
-
   let birth_date p = Adef.od_of_cdate (get_birth p)
 
   let birth_place conf base p =
@@ -160,9 +133,6 @@ module Person = struct
   let events conf base p =
     Perso.events_list conf base p
 
-  let father_age_at_birth conf base p =
-    Perso.string_of_parent_age conf base (p, true) get_father
-
   let first_name base p =
     p_first_name base p
 
@@ -175,17 +145,6 @@ module Person = struct
   let first_name_key_val base p =
     Name.lower (p_first_name base p)
 
-  let first_name_key_strip base p =
-    Name.strip_c (p_first_name base p) '"'
-
-  let nb_families conf p =
-    match env.p_link with
-    | Some _ ->
-      List.length (Perso_link.get_family_correspondance conf.command (get_iper p))
-    | _ ->
-      Array.length (get_family p)
-
-
   let history_file base p =
     let fn = sou base (get_first_name p) in
     let sn = sou base (get_surname p) in
@@ -193,21 +152,6 @@ module Person = struct
 
   let image base p =
     sou base (get_image p)
-
-  let image_html_url conf base p =
-    Perso.string_of_image_url conf base (p, true) true
-
-  let image_size conf base p =
-    Perso.string_of_image_size conf base (p, true)
-
-  let image_medium_size conf base p =
-    Perso.string_of_image_medium_size conf base (p, true)
-
-  let image_small_size conf base p =
-    Perso.string_of_image_small_size conf base (p, true)
-
-  let image_url conf base p =
-    Perso.string_of_image_url conf base (p, true) false
 
   let is_accessible_by_key conf base p =
     Util.accessible_by_key
@@ -224,7 +168,6 @@ module Person = struct
       else false
     | _ -> false
 
-
   let linked_page conf base p s =
     let bdir = Util.base_path [] (conf.bname ^ ".gwb") in
     let fname = Filename.concat bdir "notes_links" in
@@ -236,59 +179,6 @@ module Person = struct
       fn, sn, get_occ p
     in
     List.fold_left (Perso.linked_page_text conf base p s key) "" db
-
-  let max_ancestor_level conf base p =
-    let emal =
-      match p_getint conf.env "v" with
-        Some i -> i
-      | None -> 120
-    in
-    Perso.max_ancestor_level conf base (get_iper p) emal + 1
-
-  let mother_age_at_birth conf base p =
-    Perso.string_of_parent_age conf base (p, true) get_mother
-
-  (* FIXME *)
-  let misc_names conf base p =
-    let list = Gwdb.person_misc_names base p (Util.nobtit conf base) in
-    let first_name = p_first_name base p in
-    let surname = p_surname base p in
-    if first_name <> "?" && surname <> "?" then
-      Name.lower (first_name ^ " " ^ surname) :: list
-    else list
-
-  let nb_children_total base p =
-    let n =
-      List.fold_left
-        (fun n ifam -> n + Array.length (get_children (foi base ifam))) 0
-        (Array.to_list (get_family p))
-    in
-    string_of_int n
-
-  let nb_children conf base p =
-    match env.fam with
-    | Some (_, fam, _, _) ->
-      string_of_int (Array.length (get_children fam))
-    | None ->
-      match env.fam_link with
-      | Some (ifam, _, _, _) ->
-        let conf =
-          match env.baseprefix with
-          | Some baseprefix -> { conf with command = baseprefix }
-          | None -> conf
-        in
-        let children =
-          Perso_link.get_children_of_fam conf.command ifam
-        in
-        string_of_int (List.length children)
-      | None ->
-        let n =
-          List.fold_left
-            (fun n ifam ->
-               n + Array.length (get_children (foi base ifam)))
-            0 (Array.to_list (get_family p))
-        in
-        string_of_int n
 
   let notes conf base p =
     if not conf.no_note then
@@ -323,8 +213,6 @@ module Person = struct
     string_with_macros conf [] s
 
   let parents p = get_parents p
-
-  let pnote = notes
 
   let rparents p = get_rparents p
 
@@ -384,25 +272,6 @@ module Person = struct
       else Array.fold_left filter hs (get_family @@ poi base imoth)
     | None -> []
 
-  let static_max_ancestor_level conf base p =
-    Perso.max_ancestor_level conf base (get_iper p) 120 + 1
-
-  let psources conf base p =
-    if not conf.no_note then
-      let env = ['i', (fun () -> Util.default_image_name base p)] in
-      let s = sou base (get_psources p) in
-      let s = string_with_macros conf env s in
-      let lines = Wiki.html_of_tlsw conf s in
-      let wi =
-        {Wiki.wi_mode = "NOTES"; Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      let s = Wiki.syntax_links conf wi (String.concat "\n" lines) in
-      if conf.pure_xhtml then Util.check_xhtml s else s
-    else ""
-
   let public_name base p =
     sou base (get_public_name p)
 
@@ -417,49 +286,7 @@ module Person = struct
   let sex p =
     index_of_sex (get_sex p)
 
-  let source conf base p =
-    let s = get_env env.src in
-    let env = ['i', (fun () -> Util.default_image_name base p)] in
-    let s =
-      let wi =
-        {Wiki.wi_mode = "NOTES";
-         Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      Wiki.syntax_links conf wi s
-    in
-    string_with_macros conf env s
-
-  let __src_aux get conf base p =
-    Array.map
-      (fun ifam ->
-         let fam = foi base ifam in
-         let isp = Gutil.spouse (get_iper p) fam in
-         if authorized_age conf base (poi base isp) then sou base (get fam)
-         else "")
-      (get_family p)
-
-  let source_baptism base p =
-    sou base (get_baptism_src p)
-
-  let source_birth base p =
-    sou base (get_birth_src p)
-
-  let source_burial base p =
-    sou base (get_burial_src p)
-
-  let source_death base p =
-    sou base (get_death_src p)
-
-  let source_fsource =
-    __src_aux get_fsources
-
-  let source_marriage =
-    __src_aux get_marriage_src
-
-  let source_psources base p =
+  let psources base p =
     sou base (get_psources p)
 
   let surname base p =
@@ -473,9 +300,6 @@ module Person = struct
 
   let surname_key_val base p =
     Name.lower (p_surname base p)
-
-  let surname_key_strip base p =
-    Name.strip_c (p_surname base p) '"'
 
   let titles p =
     get_titles p
