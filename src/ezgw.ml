@@ -50,8 +50,12 @@ let env = empty
 
 let get_env x = match x with Some x -> x | None -> raise Not_found
 
+let safe_sou base istr k =
+  if istr = dummy_istr then ""
+  else k @@ sou base istr
+
 let mk_note conf base env note =
-  let s = sou base note in
+  safe_sou base note @@ fun s ->
   let s = string_with_macros conf env s in
   let lines = Wiki.html_of_tlsw conf s in
   let wi =
@@ -82,7 +86,7 @@ module Person = struct
   let birth_date p = Adef.od_of_cdate (get_birth p)
 
   let birth_place conf base p =
-    Util.string_of_place conf (sou base (get_birth_place p))
+    safe_sou base (get_birth_place p) @@ Util.string_of_place conf
 
   let birth_note conf base p =
     mk_person_note conf base p (get_birth_note p)
@@ -90,7 +94,7 @@ module Person = struct
   let baptism_date p = Adef.od_of_cdate (get_baptism p)
 
   let baptism_place conf base p =
-    Util.string_of_place conf (sou base (get_baptism_place p))
+    safe_sou base (get_baptism_place p) @@ Util.string_of_place conf
 
   let baptism_note conf base p =
     mk_person_note conf base p (get_baptism_note p)
@@ -99,7 +103,7 @@ module Person = struct
     get_burial p
 
   let burial_place conf base p =
-    Util.string_of_place conf (sou base (get_burial_place p))
+    safe_sou base (get_burial_place p) @@ Util.string_of_place conf
 
   let burial_note conf base p =
     mk_person_note conf base p (get_burial_note p)
@@ -113,7 +117,7 @@ module Person = struct
     else 0.
 
   let cremation_place conf base p =
-    Util.string_of_place conf (sou base (get_burial_place p))
+    safe_sou base (get_burial_place p) @@ Util.string_of_place conf
 
   let dates conf base p =
     DateDisplay.short_dates_text conf base p
@@ -122,7 +126,7 @@ module Person = struct
     get_death p
 
   let death_place conf base p =
-    Util.string_of_place conf (sou base (get_death_place p))
+    safe_sou base (get_death_place p) @@ Util.string_of_place conf
 
   let death_note conf base p =
     mk_person_note conf base p (get_death_note p)
@@ -181,36 +185,14 @@ module Person = struct
     List.fold_left (Perso.linked_page_text conf base p s key) "" db
 
   let notes conf base p =
-    if not conf.no_note then
-      let env = ['i', (fun () -> Util.default_image_name base p)] in
-      let s = sou base (get_notes p) in
-      let s = string_with_macros conf env s in
-      let lines = Wiki.html_of_tlsw conf s in
-      let wi =
-        {Wiki.wi_mode = "NOTES"; Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      let s = Wiki.syntax_links conf wi (String.concat "\n" lines) in
-      if conf.pure_xhtml then Util.check_xhtml s else s
+    if not conf.no_note then mk_person_note conf base p (get_notes p)
     else ""
 
   let occ p =
     get_occ p
 
   let occupation conf base p =
-    let s = sou base (get_occupation p) in
-    let s =
-      let wi =
-        {Wiki.wi_mode = "NOTES"; Wiki.wi_cancel_links = conf.cancel_links;
-         Wiki.wi_file_path = Notes.file_path conf base;
-         Wiki.wi_person_exists = person_exists conf base;
-         Wiki.wi_always_show_link = conf.wizard || conf.friend}
-      in
-      Wiki.syntax_links conf wi s
-    in
-    string_with_macros conf [] s
+    mk_note conf base [] (get_occupation p)
 
   let parents p = get_parents p
 
@@ -273,7 +255,7 @@ module Person = struct
     | None -> []
 
   let public_name base p =
-    sou base (get_public_name p)
+    safe_sou base (get_public_name p) @@ fun x -> x
 
   let qualifier base p =
     match get_qualifiers p with
@@ -287,7 +269,7 @@ module Person = struct
     index_of_sex (get_sex p)
 
   let psources base p =
-    sou base (get_psources p)
+    safe_sou base (get_psources p) @@ fun x -> x
 
   let surname base p =
     p_surname base p
@@ -371,13 +353,13 @@ module Event = struct
     Adef.od_of_cdate d
 
   let place conf base (_, _, p, _, _, _, _) =
-    Util.string_of_place conf (sou base p)
+    safe_sou base p @@ Util.string_of_place conf
 
   let spouse_opt (_, _, _, _, _, _, isp) =
     isp
 
   let src base (_, _, _, _, s, _, _) =
-    sou base s
+    safe_sou base s @@ fun x -> x
 
   let kind (n, _, _, _, _, _, _) =
     match n with
