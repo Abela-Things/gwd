@@ -17,18 +17,20 @@ let is_cache_iper_inorder_uptodate conf base =
   with
     Unix.Unix_error _ -> false
 
+let compare_persons base p1 p2 =
+  let res_surname =
+    Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
+  if res_surname != 0 then res_surname
+  else let res_firstname =
+         Gutil.alphabetic_utf_8 (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
+    if res_firstname != 0 then res_firstname
+    else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+
 let build_cache_iper_inorder conf base =
   let module PerSet =
     Set.Make (struct
       type t = person
-      let compare p1 p2 =
-        let res_surname =
-          Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
-        if res_surname != 0 then res_surname
-        else let res_firstname =
-               Gutil.alphabetic_utf_8 (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
-          if res_firstname != 0 then res_firstname
-          else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+      let compare p1 p2 = compare_persons base p1 p2
     end)
   in
   Gwdb.load_persons_array base ;
