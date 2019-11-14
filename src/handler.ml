@@ -516,39 +516,38 @@ let handler =
           )
 
       | "LIST_IND" ->
-        (fun _self conf base -> 
-        let access_person iper = Data.pget conf base iper in
-        let page_num = Opt.default 0 @@ Util.p_getint conf.env "pg" in
-        let page_size = Opt.default 50 @@ Util.p_getint conf.env "sz" in
-        let letter = Util.p_getenv conf.env "letter" in
-        if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base;
-        let person_count, first_letters, iper_list, page_num = read_cache_iper_inorder conf page_num page_size letter in
-        let page_count = person_count / page_size - if person_count mod page_size == 0 then 1 else 0 in
-        let person_to_display = List.map (fun iper -> access_person iper) iper_list in
-        let letter_crible =
-          let rec build_crible letters_idx idx =
-            if idx == page_size then []
-            else
-              match letters_idx with
-              | [] -> Tbool false :: build_crible letters_idx (idx + 1)
-              | (_, i) :: tl -> if i - (page_size * page_num) < 0
-                                  then build_crible tl idx
-                                else if i - (page_size * page_num) == idx
-                                  then Tbool true :: build_crible tl (idx + 1)
-                                else Tbool false :: build_crible letters_idx (idx + 1)
-          in build_crible first_letters 0
-        in
-        let letter_list = List.map (fun (l, _) -> Tstr l) first_letters in
-        let models = ("letter_list", Tlist letter_list)
-          :: ("letter_crible", Tlist letter_crible)
-          :: ("person_list", Tlist person_to_display)
-          :: ("page_num", Tint page_num)
-          :: ("page_size", Tint page_size)
-          :: ("page_count", Tint page_count)
-          :: Data.default_env conf base
-        in
-        Interp.render ~conf ~file:"list_ind" ~models
-        ) self conf base
+        begin
+          let num = Opt.default 0 @@ Util.p_getint conf.env "pg" in
+          let size = Opt.default 50 @@ Util.p_getint conf.env "sz" in
+          let letter = Util.p_getenv conf.env "letter" in
+          if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base ;
+          let person_count, first_letters, ipers, num = read_cache_iper_inorder conf num size letter in
+          let page_count = person_count / size - if person_count mod size == 0 then 1 else 0 in
+          let person_to_display = List.map (Data.pget conf base) ipers in
+          let letter_crible =
+            let rec build_crible letters_idx idx =
+              if idx == size then []
+              else
+                match letters_idx with
+                | [] -> Tbool false :: build_crible letters_idx (idx + 1)
+                | (_, i) :: tl -> if i - (size * num) < 0
+                  then build_crible tl idx
+                  else if i - (size * num) == idx
+                  then Tbool true :: build_crible tl (idx + 1)
+                  else Tbool false :: build_crible letters_idx (idx + 1)
+            in build_crible first_letters 0
+          in
+          let letter_list = List.map (fun (l, _) -> Tstr l) first_letters in
+          let models = ("letter_list", Tlist letter_list)
+                       :: ("letter_crible", Tlist letter_crible)
+                       :: ("person_list", Tlist person_to_display)
+                       :: ("page_num", Tint num)
+                       :: ("page_size", Tint size)
+                       :: ("page_count", Tint page_count)
+                       :: Data.default_env conf base
+          in
+          Interp.render ~conf ~file:"list_ind" ~models
+        end
 
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
