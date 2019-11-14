@@ -4,18 +4,11 @@ open Config
 open Jingoo
 open Jg_types
 
-let sublist l start size =
-(* FIXME: How can I raise an error here? for start < 0.
-  Should I put this in Util ? *)
-  let rec get_start l start =
-    match l with
-      _ :: tl -> if start > 0 then get_start tl (start - 1) else l
-    | _ -> []
-  in
-  Util.reduce_list size (get_start l start)
+let list_ind_file conf =
+  Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_iper_inorder"
 
 let is_cache_iper_inorder_uptodate conf base =
-  let cache_path = (Util.base_path [] (conf.bname ^ ".gwb")) ^ "cache_iper_inorder" in
+  let cache_path = list_ind_file conf in
   try
     let cache_stat = Unix.stat (cache_path) in
     let cache_timeof_modif = cache_stat.Unix.st_mtime in
@@ -25,63 +18,58 @@ let is_cache_iper_inorder_uptodate conf base =
     Unix.Unix_error _ -> false
 
 let build_cache_iper_inorder conf base =
-  let compare_persons p1 p2 =
-    let res_surname =
-      Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
-    if res_surname != 0 then res_surname
-    else let res_firstname =
-      Gutil.alphabetic_utf_8 (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
-      if res_firstname != 0 then res_firstname
-      else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+  let module PerSet =
+    Set.Make (struct
+      type t = person
+      let compare p1 p2 =
+        let res_surname =
+          Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2) in
+        if res_surname != 0 then res_surname
+        else let res_firstname =
+               Gutil.alphabetic_utf_8 (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) in
+          if res_firstname != 0 then res_firstname
+          else Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+    end)
   in
-  let module PerSet = Set.Make (struct type t = person let compare = compare_persons end)
-  in
-  let sorted_person_set = Gwdb.Collection.fold
-    (* FIXME: stop checking is_empty_name when possible *)
-    (fun set p ->
+  Gwdb.load_persons_array base ;
+  Gwdb.load_strings_array base ;
+  let set =
+    Gwdb.Collection.fold begin fun set p ->
+      (* FIXME: stop checking is_empty_name when possible *)
       if (Util.is_empty_name p) then set
       else PerSet.add p set
-    ) PerSet.empty (Gwdb.persons base) in
-  let sorted_person_list = PerSet.elements sorted_person_set in
-  let cache_filename = Filename.concat
-    (Util.base_path [] conf.bname ^ ".gwb")
-    "cache_iper_inorder" in
-  let rec get_first_letters_occ li plist idx =
-    (* volontarily case sensitive *)
-    let add_letter surname = 
-      let real = let _, i = Name.unaccent_utf_8 true surname 0 in String.sub surname 0 i
-      in
-      if List.mem_assoc real li then li else (real, idx) :: li
-    in
-    match plist with
-    | [] -> li
-    | hd :: tl -> get_first_letters_occ (add_letter (Ezgw.Person.surname base hd)) tl (idx + 1)
+    end PerSet.empty (Gwdb.persons base)
   in
-  let person_count = PerSet.cardinal sorted_person_set in
-  let first_letters = List.rev (get_first_letters_occ [] sorted_person_list 0) in
-  let iper_list = List.map Gwdb.get_iper (PerSet.elements sorted_person_set) in
-  try
-    let oc = Secure.open_out_bin cache_filename in
-      output_binary_int oc person_count;
-      output_value oc first_letters;
-      let m1 = pos_out oc in
-      List.iter (fun _ -> output_binary_int oc 0) iper_list;
-      let m2 = pos_out oc in
-      let rec output_ipers m1 m2 ipers =
-        match ipers with
-        | [] -> ()
-        | hd::tl ->
-          seek_out oc m1;
-          output_binary_int oc m2;
-          let m1 = pos_out oc in
-          seek_out oc m2;
-          output_value oc hd;
-          let m2 = pos_out oc in
-          output_ipers m1 m2 tl
-      in
-      output_ipers m1 m2 iper_list;
-    close_out oc
-  with Sys_error _ -> ()
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
+  let cache_filename = list_ind_file conf in
+  let cnt = PerSet.cardinal set in
+  let _, letters =
+    PerSet.fold begin fun x (idx, acc) ->
+      let s = Ezgw.Person.surname base x in
+      let _, i = Name.unaccent_utf_8 true s 0 in
+      let c = String.sub s 0 i in
+      if List.mem_assoc c acc then (succ idx, acc) else (succ idx, (c, idx) :: acc)
+    end set (0, [])
+  in
+  let letters = List.rev letters in
+  let oc = Secure.open_out_bin cache_filename in
+  output_binary_int oc cnt;
+  output_value oc letters;
+  let m1 = pos_out oc in
+  PerSet.iter (fun _ -> output_binary_int oc 0) set ;
+  let m2 = pos_out oc in
+  ignore @@
+  PerSet.fold begin fun x (m1, m2) ->
+    seek_out oc m1 ;
+    output_binary_int oc m2 ;
+    let m1 = pos_out oc in
+    seek_out oc m2 ;
+    output_value oc (get_iper x) ;
+    let m2 = pos_out oc in
+    (m1, m2)
+  end set (m1, m2) ;
+  close_out oc
 
 let read_cache_iper_inorder conf page page_size letter =
   let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
