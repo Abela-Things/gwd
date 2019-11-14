@@ -62,22 +62,56 @@ let build_cache_iper_inorder conf base =
   let iper_list = List.map Gwdb.get_iper (PerSet.elements sorted_person_set) in
   try
     let oc = Secure.open_out_bin cache_filename in
-      (* memory optimizations may be necessary later. *)
-      output_value oc person_count;
+      output_binary_int oc person_count;
       output_value oc first_letters;
-      output_value oc iper_list;
+      let m1 = pos_out oc in
+      List.iter (fun _ -> output_binary_int oc 0) iper_list;
+      let m2 = pos_out oc in
+      let rec output_ipers m1 m2 ipers =
+        match ipers with
+        | [] -> ()
+        | hd::tl ->
+          seek_out oc m1;
+          output_binary_int oc m2;
+          let m1 = pos_out oc in
+          seek_out oc m2;
+          output_value oc hd;
+          let m2 = pos_out oc in
+          output_ipers m1 m2 tl
+      in
+      output_ipers m1 m2 iper_list;
     close_out oc
   with Sys_error _ -> ()
 
-(*TODO give letter to read_cache to only read what is needed, and write size to cache.*)
-let read_cache_iper_inorder conf =
+let read_cache_iper_inorder conf page page_size letter =
   let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
   let ic = Secure.open_in_bin cache_filename in
-  let person_count : int = input_value ic in
+  let person_count = input_binary_int ic in
   let first_letters : (string * int) list = input_value ic in
-  let iper_list : iper list = input_value ic in
+  let page =
+    match letter with
+    | None -> page
+    | Some letter -> match List.find_opt (fun (s, _) -> String.compare letter s == 0) first_letters with
+        | None -> page
+        | Some (_, idx) -> idx / page_size
+  in
+  let first_idx = page * page_size in
+  seek_in ic (pos_in ic + (first_idx * 4));
+  let iper_offset = input_binary_int ic in
+  seek_in ic iper_offset;
+  let page_size = if page_size * (page + 1) > person_count
+    then person_count - (page_size * page)
+    else page_size
+  in
+  let iper_list =
+    let rec read size =
+      match size with
+      | 0 -> []
+      | _ -> let i : iper = input_value ic in i :: read (size - 1)
+    in read page_size
+  in
   close_in ic ;
-  person_count, first_letters, iper_list
+  person_count, first_letters, iper_list, page
 
 let restricted_wizard fn self conf base =
   if conf.wizard then fn self conf base
@@ -494,24 +528,15 @@ let handler =
           )
 
       | "LIST_IND" ->
-        (* pages are accessed with an index 'pg' and display a specified 'sz' number of persons. *)
         (fun _self conf base -> 
         let access_person iper = Data.pget conf base iper in
         let page_num = Opt.default 0 @@ Util.p_getint conf.env "pg" in
         let page_size = Opt.default 50 @@ Util.p_getint conf.env "sz" in
         let letter = Util.p_getenv conf.env "letter" in
         if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base;
-        let person_count, first_letters, iper_list = read_cache_iper_inorder conf in
+        let person_count, first_letters, iper_list, page_num = read_cache_iper_inorder conf page_num page_size letter in
         let page_count = person_count / page_size - if person_count mod page_size == 0 then 1 else 0 in
-        let page_num, iper_to_display =
-          match letter with
-          | None -> page_num, sublist iper_list (page_num * page_size) (page_size)
-          | Some letter -> match List.find_opt (fun (s, _) -> String.compare letter s == 0) first_letters with
-              | None -> page_num, sublist iper_list (page_num * page_size) (page_size)
-              | Some (_, idx) -> let page_num = idx / page_size in
-                page_num, sublist iper_list (page_num * page_size) (page_size)
-        in
-        let person_to_display = List.map (fun iper -> access_person iper) iper_to_display in
+        let person_to_display = List.map (fun iper -> access_person iper) iper_list in
         let letter_crible =
           let rec build_crible letters_idx idx =
             if idx == page_size then []
