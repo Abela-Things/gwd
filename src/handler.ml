@@ -609,8 +609,6 @@ let handler =
           let t1 = Unix.gettimeofday () in (*time measure*)
           if not (is_cache_homonyms_uptodate conf base) then build_cache_homonyms conf base;
           let homonyms = read_cache_homonyms conf base in
-          Gwdb.clear_persons_array base ;
-          Gwdb.clear_strings_array base ;
           let models = 
             ("homonyms", Tlist homonyms) :: Data.default_env conf base
           in

@@ -1,23 +1,35 @@
-<html>
 {%- include 'perso_utils.jingoo' -%}
 {%- include 'utils.jingoo' -%}
 
-<div>
+<html>
+
+<div id="List des homonymes">
 <ul>
 {%- for plist in homonyms -%}
   <li>
   {%- for p in plist -%}
     {%- if loop.first -%}
-      {{ print_reference_person(p) }} <br>
+      {{ p.first_name }} {{ p.surname }}, {{ length(plist) }} homonymes.
       <ul>
     {%- endif -%}
       <li>
-    {{ print_reference_person(p) }} <br>
+
+    {{ print_reference_person(p) }}
+    {%- if p.dates %} {{ p.dates }}{% endif -%}
+    {%- if p.father and p.mother %},
+      {{ trans_a_of_b ( ('son/daughter/child'|trans(p.sex))
+      , (person_text(p.father) + ' &amp; ' + person_text(p.mother)) ) }}
+    {%- endif -%}
+    {%- for f in p.families %}
+      , &amp; {% if loop.length > 1 %} {{ loop.index }}{% endif %}
+      {{ f.spouse.first_name }}.{{ f.spouse.occ }} {{ f.spouse.surname }}{{ f.spouse.date }}
+    {%- endfor -%}
+
       </li>
   {%- endfor -%}
-    </ul> <br>
+      </ul> <br>
   </li>
 {%- endfor -%}
 </ul>
-
 </div>
+
