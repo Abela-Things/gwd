@@ -1,0 +1,23 @@
+<html>
+{%- include 'perso_utils.jingoo' -%}
+{%- include 'utils.jingoo' -%}
+
+<div>
+<ul>
+{%- for plist in homonyms -%}
+  <li>
+  {%- for p in plist -%}
+    {%- if loop.first -%}
+      {{ print_reference_person(p) }} <br>
+      <ul>
+    {%- endif -%}
+      <li>
+    {{ print_reference_person(p) }} <br>
+      </li>
+  {%- endfor -%}
+    </ul> <br>
+  </li>
+{%- endfor -%}
+</ul>
+
+</div>

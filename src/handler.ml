@@ -4,6 +4,58 @@ open Config
 open Jingoo
 open Jg_types
 
+type person_hash_table = ((string * string), iper list) Hashtbl.t
+
+let homonyms_file conf =
+  Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
+
+let is_cache_homonyms_uptodate conf base =
+  let cache_path = homonyms_file conf in
+  try
+    let cache_stat = Unix.stat (cache_path) in
+    let cache_timeof_modif = cache_stat.Unix.st_mtime in
+    let base_timeof_modif = Gwdb.date_of_last_change base in
+    (base_timeof_modif < cache_timeof_modif)
+  with
+    Unix.Unix_error _ -> false
+
+let read_cache_homonyms conf base =
+  let cache_filename = homonyms_file conf in
+  let ic = Secure.open_in_bin cache_filename in
+  let cache_homonyms : iper list list = input_value ic in
+  close_in ic;
+  List.fold_left (fun homonyms iper_list ->
+    (Tlist (List.fold_left (fun l iper -> (Data.pget conf base iper) :: l) [] iper_list)) :: homonyms
+  ) [] cache_homonyms
+
+let build_cache_homonyms conf base =
+  let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
+  Gwdb.load_persons_array base ;
+  Gwdb.load_strings_array base ;
+  Gwdb.Collection.fold (fun _ p ->
+    (* FIXME: stop checking is_empty_name when possible *)
+    if not (Util.is_empty_name p) then
+      let first_name = Ezgw.Person.first_name base p in
+      let surname = Ezgw.Person.surname base p in
+      match Hashtbl.find_opt person_hash (first_name, surname) with
+        None ->
+          Hashtbl.add person_hash (first_name, surname) [Gwdb.get_iper p]
+      | Some ipers ->
+          Hashtbl.replace person_hash (first_name, surname) ((Gwdb.get_iper p) :: ipers)
+  ) () (Gwdb.persons base);
+  let homonyms = Hashtbl.fold (fun _ ipers homonyms ->
+    if List.length ipers > 1 then 
+        ipers :: homonyms
+    else homonyms
+  ) person_hash []
+  in
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
+  let cache_filename = homonyms_file conf in
+  let oc = Secure.open_out_bin cache_filename in
+  output_value oc homonyms;
+  close_out oc
+
 let list_ind_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_iper_inorder"
 
@@ -74,7 +126,7 @@ let build_cache_iper_inorder conf base =
   close_out oc
 
 let read_cache_iper_inorder conf page page_size letter =
-  let cache_filename = Filename.concat (Util.base_path [] conf.bname ^ ".gwb") "cache_iper_inorder" in
+  let cache_filename = list_ind_file conf in
   let ic = Secure.open_in_bin cache_filename in
   let person_count = input_binary_int ic in
   let first_letters : (string * int) list = input_value ic in
@@ -549,6 +601,23 @@ let handler =
                        :: Data.default_env conf base
           in
           Interp.render ~conf ~file:"list_ind" ~models
+        end
+
+      | "HOMONYMS" ->
+        begin
+          let p1 = Sys.time () in (*time measure*)
+          let t1 = Unix.gettimeofday () in (*time measure*)
+          if not (is_cache_homonyms_uptodate conf base) then build_cache_homonyms conf base;
+          let homonyms = read_cache_homonyms conf base in
+          Gwdb.clear_persons_array base ;
+          Gwdb.clear_strings_array base ;
+          let models = 
+            ("homonyms", Tlist homonyms) :: Data.default_env conf base
+          in
+          let t2 = Unix.gettimeofday () in (*time measure*)
+          let p2 = Sys.time () in (*time measure*)
+          Printf.printf "[%s]: %f seconds (~%f seconds of CPU time).\n%!" "homonyms" (t2 -. t1) (p2 -. p1) ; (*time measure*)
+          Interp.render ~conf ~file:"homonyms" ~models
         end
 
       | _ -> self.RequestHandler.incorrect_request self conf base
