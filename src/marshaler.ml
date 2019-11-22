@@ -6,6 +6,7 @@ let marshal dump verbose env file =
   inline_const_cnt := 0 ;
   inline_trans_cnt := 0 ;
   preapply_cnt := 0 ;
+  literal_to_text_cnt := 0 ;
   concat_cnt := 0 ;
   flatten_cnt := 0 ;
   if verbose then print_string @@ "Marshaling " ^ file ^ ":" ;
@@ -19,7 +20,12 @@ let marshal dump verbose env file =
     with e -> raise @@ SyntaxError (Jg_utils.get_parser_error e lexbuf)
   in
   close_in ch_in ;
+  let rec loop stmts fn =
+    let stmts' = fn stmts in
+    if stmts' = stmts then stmts else loop stmts' fn
+  in
   let ast =
+    loop ast @@ fun ast ->
     (* General optimizations *)
     Jg_interp.unfold_extends env ast
     |> Jg_ast_optimize.inline_include env
@@ -33,9 +39,11 @@ let marshal dump verbose env file =
   List.iter
     (fun (lang, trans) ->
        let ast =
+         loop ast @@ fun ast ->
          (* Other optimizations *)
          inline_trans trans ast
          |> preapply
+         |> literal_to_text
          |> flatten
          |> concat
        in
@@ -65,10 +73,11 @@ let marshal dump verbose env file =
   if verbose then begin
     print_endline " DONE!" ;
     print_endline @@ Printf.sprintf
-      "inline_const: %d / inline_trans: %d / preapply: %d / concat: %d / flatten: %d"
+      "inline_const: %d / inline_trans: %d / preapply: %d / literal_to_text: %d / concat: %d / flatten: %d"
       !inline_const_cnt
       !inline_trans_cnt
       !preapply_cnt
+      !literal_to_text_cnt
       !concat_cnt
       !flatten_cnt
   end

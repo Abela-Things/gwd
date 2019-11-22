@@ -108,6 +108,26 @@ let preapply stmts =
   let mapper = { Jg_ast_mapper.default_mapper with statement ; expression } in
   mapper.ast mapper stmts
 
+let literal_to_text_cnt = ref 0
+
+let literal_to_text stmts =
+  let open Jg_ast_mapper in
+  let functions = ref [] in
+  let statement self = function
+    (* a function returns a tvalue, it do not print text *)
+    | FunctionStatement _ as s ->
+      functions := () :: !functions ;
+      let s = default_mapper.statement self s in
+      functions := List.tl @@ !functions ;
+      s
+    | ExpandStatement (LiteralExpr e) when !functions = [] ->
+      incr literal_to_text_cnt ;
+      TextStatement (Jg_runtime.string_of_tvalue e)
+    | s -> default_mapper.statement self s
+  in
+  let mapper = { Jg_ast_mapper.default_mapper with statement } in
+  mapper.ast mapper stmts
+
 let concat_cnt = ref 0
 
 let concat stmts =
