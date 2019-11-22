@@ -883,6 +883,35 @@ let module_OPT =
     | _ -> raise Not_found
   end
 
+let module_NAME base =
+  let get_particle s = Mutil.get_particle (Gwdb.base_particles base) s in
+  let particle =
+    func_arg1_no_kw begin function
+      | Tstr s -> begin match get_particle s with
+          | "" -> Tnull
+          | s -> Tstr (String.trim s)
+        end
+      | _ -> assert false
+    end
+  in
+  let without_particle =
+    func_arg1_no_kw begin function
+      | Tstr s -> begin match get_particle s with
+          | "" -> Tstr s
+          | part ->
+            let l = String.length part in
+            let s = String.sub s l (String.length s - l) in
+            Tstr s
+        end
+      | _ -> assert false
+    end
+  in
+  Tpat begin function
+    | "particle" -> particle
+    | "without_particle" -> without_particle
+    | _ -> raise Not_found
+  end
+
 let mk_conf conf =
   let wizard = Tvolatile (fun () -> Tbool conf.Config.wizard) in
   let friend = Tbool conf.friend in
@@ -1114,10 +1143,12 @@ let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tval
 
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf in
+  let module_NAME = module_NAME base in
   ("trans", trans conf)
   :: ("trans_a_of_b", trans_a_of_b conf)
   :: ("DATE", module_date conf)
   :: ("OPT", module_OPT)
+  :: ("NAME", module_NAME)
   :: ("GET_PERSON", get_person conf base)
   :: ("env", mk_env conf base)
   :: ("decode_varenv", decode_varenv)

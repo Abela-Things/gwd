@@ -25,7 +25,7 @@
   (package gwd)
   (name gwd)
   (public_name gwd)
-  (libraries gwxjg marshaler_lib geneweb jingoo piqirun.ext)
+  (libraries uutf uucp unidecode gwxjg marshaler_lib geneweb jingoo piqirun.ext)
   (modules api_app_piqi api_app_piqi_ext api_app gwd handler interp)
 )
 
