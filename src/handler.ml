@@ -430,6 +430,17 @@ let handler =
       Interp.render ~conf ~file:"lm" ~models
     end
 
+  ; h = begin fun self conf base ->
+      match Util.p_getenv conf.env "v" with
+      | Some "search_list" ->
+        Interp.render
+          ~conf
+          ~file:"search_list"
+          ~models:(Data.default_env conf base)
+      | Some f -> SrcfileDisplay.print conf base f
+      | None -> self.incorrect_request self conf base
+    end
+
   ; mod_data = restricted_wizard begin fun self conf base ->
       match Util.p_getenv conf.env "data" with
       | Some ("place" | "src" | "occu") | None ->
