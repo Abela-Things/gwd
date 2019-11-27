@@ -10,7 +10,7 @@
 (library
   (public_name gwxjg)
   (wrapped false)
-  (libraries unix geneweb.gwdb1 geneweb.wserver geneweb jingoo)
+  (libraries unix geneweb-lib jingoo)
   (modules ezgw data trans lexicon_parser)
 )
 
@@ -25,12 +25,12 @@
   (package gwd)
   (name gwd)
   (public_name gwd)
-  (libraries uutf uucp unidecode gwxjg marshaler_lib geneweb jingoo piqirun.ext)
+  (libraries uutf uucp unidecode gwxjg marshaler_lib geneweb-gwdb-legacy geneweb-wserver geneweb-sosa-zarith geneweb-lib jingoo piqirun.ext)
   (modules api_app_piqi api_app_piqi_ext api_app gwd handler interp)
 )
 
 (executable
   (name marshaler)
-  (libraries uucp jingoo gwxjg marshaler_lib)
+  (libraries uucp jingoo geneweb-gwdb-legacy geneweb-wserver geneweb-sosa-zarith gwxjg marshaler_lib)
   (modules marshaler)
 )

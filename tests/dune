@@ -1,7 +1,7 @@
 (library
   (name test_lib)
   (wrapped false)
-  (libraries geneweb.gwdb1 geneweb.wserver geneweb gwxjg)
+  (libraries geneweb-gwdb-legacy geneweb-wserver geneweb-sosa-zarith geneweb-lib gwxjg)
   (modules test_utils)
 )
 
