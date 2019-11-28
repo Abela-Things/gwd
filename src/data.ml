@@ -922,6 +922,7 @@ let mk_conf conf =
   let benv = Tlazy (lazy (Tobj (List.map (fun (k, v) -> (k, Tstr v)) conf.base_env))) in
   let today = mk_dmy conf.today in
   let image_prefix = Tstr "https://gw.geneanet.org/images/"(* conf.image_prefix *) in
+  let user = Tstr conf.user in
   Tpat begin function
     | "benv" -> benv
     | "command" -> command
@@ -931,6 +932,7 @@ let mk_conf conf =
     | "image_prefix" -> image_prefix
     | "senv" -> senv
     | "today" -> today
+    | "user" -> user
     | "wizard" -> wizard
     | _ -> raise Not_found
   end
@@ -964,6 +966,7 @@ let mk_base base =
   Tpat begin function
     | "nb_of_persons" -> Tint (Gwdb.nb_of_persons base)
     | "nb_of_families" -> Tint (Gwdb.nb_of_families base)
+    | "name" -> Tstr (Gwdb.bname base)
     | _ -> raise Not_found
   end
 
