@@ -160,16 +160,12 @@ let is_cache_iper_inorder_uptodate conf base =
 let build_cache_iper_inorder conf base =
   let module PerSet =
     Set.Make (struct
-      type t = person
-      let compare p1 p2 =
-        match
-          alphabetic
-            (Util.name_key base @@ Ezgw.Person.surname base p1)
-            (Util.name_key base @@ Ezgw.Person.surname base p2)
-        with
+      type t = (string * istr * int * iper)
+      let compare (s1, f1, o1, _) (s2, f2, o2, _) =
+        match alphabetic s1 s2 with
         | 0 -> begin
-            match alphabetic (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2) with
-            | 0 -> compare (Ezgw.Person.occ p1) (Ezgw.Person.occ p2)
+            match alphabetic (Gwdb.sou base f1) (Gwdb.sou base f2) with
+            | 0 -> compare o1 o2
             | x -> x
           end
         | x -> x
@@ -181,7 +177,10 @@ let build_cache_iper_inorder conf base =
     Gwdb.Collection.fold begin fun set p ->
       (* FIXME: stop checking is_empty_name when possible *)
       if (Util.is_empty_name p) || not (Util.authorized_age conf base p) then set
-      else PerSet.add p set
+      else PerSet.add (Util.name_key base (sou base @@ get_surname p)
+                      , get_first_name p
+                      , get_occ p
+                      , get_iper p) set
     end PerSet.empty (Gwdb.persons base)
   in
   Gwdb.clear_persons_array base ;
@@ -189,8 +188,8 @@ let build_cache_iper_inorder conf base =
   let cache_filename = list_ind_file conf in
   let cnt = PerSet.cardinal set in
   let _, letters =
-    PerSet.fold begin fun x (idx, acc) ->
-      let c = lower_fst @@ Util.name_key base @@ Ezgw.Person.surname base x in
+    PerSet.fold begin fun (x, _, _, _) (idx, acc) ->
+      let c = lower_fst x in
       if List.mem_assoc c acc then (succ idx, acc) else (succ idx, (c, idx) :: acc)
     end set (0, [])
   in
@@ -204,12 +203,12 @@ let build_cache_iper_inorder conf base =
   PerSet.iter (fun _ -> output_binary_int oc 0) set ;
   let m2 = pos_out oc in
   ignore @@
-  PerSet.fold begin fun x (m1, m2) ->
+  PerSet.fold begin fun (_, _, _, i) (m1, m2) ->
     seek_out oc m1 ;
     output_binary_int oc m2 ;
     let m1 = pos_out oc in
     seek_out oc m2 ;
-    output_value oc (get_iper x) ;
+    output_value oc i ;
     let m2 = pos_out oc in
     (m1, m2)
   end set (m1, m2) ;
