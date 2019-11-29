@@ -4,9 +4,6 @@ open Config
 open Jingoo
 open Jg_types
 
-type person_hash_table = ((string * string), iper list) Hashtbl.t
-type jingoo_person_hash_table = ((string * string), tvalue list) Hashtbl.t
-
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
@@ -34,7 +31,7 @@ let read_cache_homonyms conf base =
   let _ = input_binary_int ic in
   let cache_homonyms : iper list list = input_value ic in
   close_in ic;
-  Printf.printf "Cache read!\n%!";
+  Printf.printf "homonyms cache red!\n%!";
   Gwdb.load_persons_array base ;
   Gwdb.load_strings_array base ;
   let result = List.map (fun iper_list ->
@@ -42,6 +39,8 @@ let read_cache_homonyms conf base =
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
   result
+
+type person_hash_table = ((string * string), person list) Hashtbl.t
 
 let build_cache_homonyms conf base =
   let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
@@ -54,22 +53,38 @@ let build_cache_homonyms conf base =
       let surname = Ezgw.Person.surname base p in
       match Hashtbl.find_opt person_hash (first_name, surname) with
         None ->
-          Hashtbl.add person_hash (first_name, surname) [Gwdb.get_iper p]
-      | Some ipers ->
-          Hashtbl.replace person_hash (first_name, surname) ((Gwdb.get_iper p) :: ipers)
+          Hashtbl.add person_hash (first_name, surname) [p]
+      | Some pers ->
+          Hashtbl.replace person_hash (first_name, surname) (p :: pers)
   ) () (Gwdb.persons base);
-  let homonyms = Hashtbl.fold (fun _ ipers homonyms ->
-    if List.length ipers > 1 then 
-        ipers :: homonyms
-    else homonyms
-  ) person_hash []
+  let compare_homonyms h1 h2 =
+    (* FIXME! replace this by the new comparison function.*)
+    let compare_names p1 p2 =
+      match Gutil.alphabetic_utf_8
+          (Util.name_key base @@ Ezgw.Person.surname base p1)
+          (Util.name_key base @@ Ezgw.Person.surname base p2)
+      with
+      | 0 -> Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2)
+      | x -> x
+    in compare_names (List.hd h1) (List.hd h2)
   in
-  Gwdb.clear_persons_array base ;
-  Gwdb.clear_strings_array base ;
+  let sorted_homonyms = List.sort compare_homonyms
+    (Hashtbl.fold (fun _ sames homonyms ->
+    if List.length sames > 1 then 
+        sames :: homonyms
+    else homonyms
+  ) person_hash [])
+  in
+  let sorted_homo_iper = List.map (fun l ->
+      List.map Gwdb.get_iper l
+    ) sorted_homonyms in
+  Gwdb.clear_persons_array base;
+  Gwdb.clear_strings_array base;
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
   output_binary_int oc homonyms_magic;
-  output_value oc homonyms;
+  output_value oc sorted_homo_iper;
+  Printf.printf "homonyms cache built!\n%!";
   close_out oc
 
 let list_ind_file conf =
