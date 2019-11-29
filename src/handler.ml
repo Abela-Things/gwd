@@ -4,6 +4,15 @@ open Config
 open Jingoo
 open Jg_types
 
+let _bench name fn =
+  let p1 = Sys.time () in
+  let t1 = Unix.gettimeofday () in
+  let res = fn () in
+  let t2 = Unix.gettimeofday () in
+  let p2 = Sys.time () in
+  Printf.printf "[%s]: %f seconds (~%f seconds of CPU time).\n" name (t2 -. t1) (p2 -. p1) ;
+  res
+
 type alphabetic = Str of string | Chr of char | Empty
 
 let unaccent trimmed s i0 len =
