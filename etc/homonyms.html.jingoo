@@ -14,7 +14,10 @@
     {%- endif -%}
       <li>
 
-    {{ print_reference_person(p) }}
+    {%--%}<a href="{{ person_href (p) }}">
+      {%- if particle -%}{{ NAME.without_particle (p.surname) }} ({{ particle }}) {{ p.first_name }}
+      {% else %}{{ p.surname }} {{ p.first_name }}{% endif %}
+    {%--%}</a>
     {%- if p.dates %} {{ p.dates }}{% endif -%}
     {%- if p.father and p.mother %},
       {{ trans_a_of_b ( ('son/daughter/child'|trans(p.sex))

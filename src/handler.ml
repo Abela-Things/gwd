@@ -5,9 +5,18 @@ open Jingoo
 open Jg_types
 
 type person_hash_table = ((string * string), iper list) Hashtbl.t
+type jingoo_person_hash_table = ((string * string), tvalue list) Hashtbl.t
 
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
+
+let homonyms_magic = 0xABE1A
+
+let check_homonyms_magic conf =
+  let ic = Secure.open_in_bin (homonyms_file conf) in
+  let res = (input_binary_int ic) == homonyms_magic in
+  close_in ic;
+  res
 
 let is_cache_homonyms_uptodate conf base =
   let cache_path = homonyms_file conf in
@@ -15,18 +24,24 @@ let is_cache_homonyms_uptodate conf base =
     let cache_stat = Unix.stat (cache_path) in
     let cache_timeof_modif = cache_stat.Unix.st_mtime in
     let base_timeof_modif = Gwdb.date_of_last_change base in
-    (base_timeof_modif < cache_timeof_modif)
+    (base_timeof_modif < cache_timeof_modif) && check_homonyms_magic conf
   with
     Unix.Unix_error _ -> false
 
 let read_cache_homonyms conf base =
   let cache_filename = homonyms_file conf in
   let ic = Secure.open_in_bin cache_filename in
+  let _ = input_binary_int ic in
   let cache_homonyms : iper list list = input_value ic in
   close_in ic;
-  List.fold_left (fun homonyms iper_list ->
-    (Tlist (List.fold_left (fun l iper -> (Data.pget conf base iper) :: l) [] iper_list)) :: homonyms
-  ) [] cache_homonyms
+  Printf.printf "Cache read!\n%!";
+  Gwdb.load_persons_array base ;
+  Gwdb.load_strings_array base ;
+  let result = List.map (fun iper_list ->
+    Tlist (List.map (fun iper -> Data.unsafe_mk_person conf base @@ Gwdb.poi base iper) iper_list)) cache_homonyms in
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
+  result
 
 let build_cache_homonyms conf base =
   let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
@@ -53,6 +68,7 @@ let build_cache_homonyms conf base =
   Gwdb.clear_strings_array base ;
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
+  output_binary_int oc homonyms_magic;
   output_value oc homonyms;
   close_out oc
 
@@ -605,16 +621,11 @@ let handler =
 
       | "HOMONYMS" ->
         begin
-          let p1 = Sys.time () in (*time measure*)
-          let t1 = Unix.gettimeofday () in (*time measure*)
           if not (is_cache_homonyms_uptodate conf base) then build_cache_homonyms conf base;
           let homonyms = read_cache_homonyms conf base in
           let models = 
             ("homonyms", Tlist homonyms) :: Data.default_env conf base
           in
-          let t2 = Unix.gettimeofday () in (*time measure*)
-          let p2 = Sys.time () in (*time measure*)
-          Printf.printf "[%s]: %f seconds (~%f seconds of CPU time).\n%!" "homonyms" (t2 -. t1) (p2 -. p1) ; (*time measure*)
           Interp.render ~conf ~file:"homonyms" ~models
         end
 
