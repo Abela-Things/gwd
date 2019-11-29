@@ -214,19 +214,12 @@ let build_cache_iper_inorder conf base =
   end set (m1, m2) ;
   close_out oc
 
-let read_cache_iper_inorder conf page page_size letter =
+let read_cache_iper_inorder conf page page_size =
   let cache_filename = list_ind_file conf in
   let ic = Secure.open_in_bin cache_filename in
   let person_count = input_binary_int ic in
   let page_count = person_count / page_size + if person_count mod page_size == 0 then 0 else 1 in
   let first_letters : (string * int) list = input_value ic in
-  let page =
-    match letter with
-    | None -> page
-    | Some letter -> match List.find_opt (fun (s, _) -> String.compare letter s == 0) first_letters with
-      | None -> page
-      | Some (_, idx) -> idx / page_size
-  in
   let page = min (page_count - 1) @@ max 0 page in
   let first_idx = page * page_size in
   seek_in ic (pos_in ic + (first_idx * 4));
@@ -672,20 +665,33 @@ let handler =
         begin
           let num = (Opt.default 1 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 2000 @@ Util.p_getint conf.env "sz" in
-          let letter = Util.p_getenv conf.env "letter" in
-          if not (is_cache_iper_inorder_uptodate conf base) then build_cache_iper_inorder conf base ;
-          let page_count, first_letters, ipers, num = read_cache_iper_inorder conf num size letter in
-          let persons = Array.map (fun i -> Data.unsafe_mk_person conf base @@ Gwdb.poi base i) ipers in
+          if not (is_cache_iper_inorder_uptodate conf base)
+          then build_cache_iper_inorder conf base ;
+          let page_count, letters, ipers, num =
+            read_cache_iper_inorder conf num size
+          in
+          let persons =
+            Array.map begin fun i ->
+              Data.unsafe_mk_person conf base @@ Gwdb.poi base i
+            end ipers
+          in
           let anchorAtIndex =
             let fst_idx = size * num in
-            let list = List.map (fun (c, i) -> (i - fst_idx, c)) first_letters  in
+            let list = List.map (fun (c, i) -> (i - fst_idx, c)) letters  in
             Jg_types.func_arg1_no_kw @@ function
             | Tint i ->
-              begin match List.assoc_opt i list with Some s -> Tstr s | None -> Tnull end
+              begin match List.assoc_opt i list with
+                |  Some s -> Tstr s
+                | None -> Tnull
+              end
             | x -> Jg_types.func_failure [x]
           in
-          let letter_list = List.map (fun (l, _) -> Tstr l) first_letters in
-          let models = ("letter_list", Tlist letter_list)
+          let letters =
+            List.map begin fun (c, i) ->
+              Tset [ Tstr c ; Tint (i / size + 1) ]
+            end letters
+          in
+          let models = ("letters", Tlist letters)
                        :: ("anchorAtIndex", anchorAtIndex)
                        :: ("persons", Tarray persons)
                        :: ("page_num", Tint (num + 1))
