@@ -1144,6 +1144,15 @@ let json_encode o =
 
 let log = func_arg1_no_kw @@ fun x -> print_endline @@ Jg_runtime.string_of_tvalue x ; Tnull
 
+let alphabetic =
+  func_arg2_no_kw @@ fun a b ->
+  let str = function
+    | Tstr b -> b
+    | Tnull -> ""
+    | _ -> failwith_type_error_2 "alphabetic" a b
+  in
+  Tint (Utf8.compare (str a) (str b) )
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf in
   let module_NAME = module_NAME base in
@@ -1156,6 +1165,7 @@ let default_env conf base (* p *) =
   :: ("env", mk_env conf base)
   :: ("decode_varenv", decode_varenv)
   :: ("encode_varenv", encode_varenv)
+  :: ("alphabetic", alphabetic)
   :: ("json_encode", func_arg1_no_kw (fun x -> Tstr (json_encode x) ))
   :: ("base", mk_base base)
   :: ("conf", conf_env)
