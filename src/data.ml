@@ -990,16 +990,23 @@ let twig = Tpat (fun s -> twigify s)
 
 let trans conf =
   let trad ~kwargs s i =
-    let s =
-      if kwargs = [] then s
-      else
-        let args = List.map (fun (_, x) -> Jg_runtime.string_of_tvalue x) kwargs in
-        s ^ ":::" ^ String.concat ":" args
-    in
-    let s = Templ.eval_transl conf false s i in
-    if s <> "" && String.get s 0 = '[' && String.get s (String.length s - 1) = ']'
-    then Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify @@ String.sub s 1 (String.length s - 2))
-    else Tstr s
+    if s = "%1 of %2" then begin
+      let a = unbox_string @@ List.assoc "_1" kwargs in
+      let b = unbox_string @@ List.assoc "_2" kwargs in
+      let elision = try unbox_string @@ List.assoc "elision" kwargs with Not_found -> b in
+      Tstr (Util.translate_eval @@ Util.transl_a_of_b conf a b elision)
+    end else begin
+      let s =
+        if kwargs = [] then s
+        else
+          let args = List.map (fun (_, x) -> Jg_runtime.string_of_tvalue x) kwargs in
+          s ^ ":::" ^ String.concat ":" args
+      in
+      let s = Templ.eval_transl conf false s i in
+      if s <> "" && String.get s 0 = '[' && String.get s (String.length s - 1) = ']'
+      then Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify @@ String.sub s 1 (String.length s - 2))
+      else Tstr s
+    end
   in
   Tfun begin fun ?(kwargs=[]) -> function
     | Tint i ->
@@ -1008,14 +1015,6 @@ let trans conf =
       end
     | Tstr s -> trad ~kwargs s ""
     | x -> Jingoo.Jg_types.failwith_type_error_1 "trans" x
-  end
-
-let trans_a_of_b conf =
-  func_arg2 begin fun ?(kwargs=[]) a b ->
-    let a = unbox_string a in
-    let b = unbox_string b in
-    let elision = try unbox_string @@ List.assoc "elision" kwargs with Not_found -> b in
-    Tstr (Util.translate_eval @@ Util.transl_a_of_b conf a b elision)
   end
 
 let get_person conf base = func_arg1_no_kw @@ function
@@ -1157,7 +1156,6 @@ let default_env conf base (* p *) =
   let conf_env = mk_conf conf in
   let module_NAME = module_NAME base in
   ("trans", trans conf)
-  :: ("trans_a_of_b", trans_a_of_b conf)
   :: ("DATE", module_date conf)
   :: ("OPT", module_OPT)
   :: ("NAME", module_NAME)
