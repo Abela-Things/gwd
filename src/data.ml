@@ -1015,7 +1015,7 @@ let trans_a_of_b conf =
     let a = unbox_string a in
     let b = unbox_string b in
     let elision = try unbox_string @@ List.assoc "elision" kwargs with Not_found -> b in
-    Tstr (Util.transl_a_of_gr_eq_gen_lev conf a b elision)
+    Tstr (Util.translate_eval @@ Util.transl_a_of_b conf a b elision)
   end
 
 let get_person conf base = func_arg1_no_kw @@ function
