@@ -998,32 +998,39 @@ let twigify filter =
 
 let twig = Tpat (fun s -> twigify s)
 
-let trans conf =
+let trans (conf : Config.config) =
   let trad ~kwargs s i =
-    if s = "%1 of %2" then begin
-      let a = unbox_string @@ List.assoc "_1" kwargs in
-      let b = unbox_string @@ List.assoc "_2" kwargs in
-      let elision = try unbox_string @@ List.assoc "elision" kwargs with Not_found -> b in
-      Tstr (Util.translate_eval @@ Util.transl_a_of_b conf a b elision)
-    end else begin
-      let s =
-        if kwargs = [] then s
-        else
-          let args = List.map (fun (_, x) -> Jg_runtime.string_of_tvalue x) kwargs in
-          s ^ ":::" ^ String.concat ":" args
+    try
+      let s = Hashtbl.find conf.lexicon s in
+      let t = Array.of_list @@ String.split_on_char '/' s in
+      let t =
+        Array.map (fun t -> Lexicon_parser.p_trad (Buffer.create 128) [] @@ Lexing.from_string t) t
       in
-      let s = Templ.eval_transl conf false s i in
-      if s <> "" && String.get s 0 = '[' && String.get s (String.length s - 1) = ']'
-      then Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify @@ String.sub s 1 (String.length s - 2))
-      else Tstr s
-    end
+      let i = if i < 0 || i >= Array.length t then 0 else i in
+      let arg s = List.assoc s kwargs in
+      let t = Array.unsafe_get t i in
+      Tstr begin
+        let conv = function
+          | Lexicon_parser.Str s -> s
+          | Arg n -> Jg_runtime.string_of_tvalue (arg n)
+        in
+        let rec loop s i =
+          if i < Array.length t
+          then loop (s ^ conv (Array.unsafe_get t i)) (i + 1)
+          else s
+        in
+        loop (conv @@ Array.unsafe_get t 0) 1
+        |> Util.translate_eval
+      end
+    with Not_found -> Tstr (Printf.sprintf "{{%s|trans}}" @@ stringify @@ s)
   in
   Tfun begin fun ?(kwargs=[]) -> function
     | Tint i ->
-      Tfun begin fun ?kwargs:_ s ->
-        trad ~kwargs (unbox_string s) (string_of_int i)
-      end
-    | Tstr s -> trad ~kwargs s ""
+      let kw = kwargs in
+      Tfun begin fun ?(kwargs=[]) s ->
+        let kwargs = List.rev_append kwargs kw in
+        trad ~kwargs (unbox_string s) i end
+    | Tstr s -> trad ~kwargs s 0
     | x -> Jingoo.Jg_types.failwith_type_error_1 "trans" x
   end
 
