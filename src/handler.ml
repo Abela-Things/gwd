@@ -171,7 +171,8 @@ let handler =
       let (list, _len) = AdvSearchOk.advanced_search conf base max_int in
       let searching_fields =
         let s = AdvSearchOk.searching_fields conf in
-        if String.get s (String.length s - 1) == ','
+        if s = "" then ""
+        else if String.get s (String.length s - 1) == ','
         then String.sub s 0 (String.length s - 1)
         else s
       in
