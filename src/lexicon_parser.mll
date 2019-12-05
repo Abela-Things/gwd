@@ -24,18 +24,21 @@ let eol = '\n'
 
 rule p_main acc = parse
   | ' '+ (line as t) eol
-      { p_main ((t, p_lang [] lexbuf) :: acc) lexbuf }
+      { p_main ((t, p_lang (String.contains t '/') [] lexbuf) :: acc) lexbuf }
   | _
       { p_main acc lexbuf }
   | eof { acc }
 
-and p_lang acc = parse
+and p_lang split acc = parse
   | ((lower | '-' )+ as lang) ':' ' '? (line as trad) eol {
-      let trad = Array.of_list @@ String.split_on_char '/' trad in
+      let trad =
+        if split then Array.of_list @@ String.split_on_char '/' trad
+        else [| trad |]
+      in
       let trad =
         Array.map (fun t -> p_trad (Buffer.create 42) [] @@ Lexing.from_string t) trad
       in
-      p_lang ((lang, trad) :: acc) lexbuf
+      p_lang split ((lang, trad) :: acc) lexbuf
     }
   | "" { acc }
 
