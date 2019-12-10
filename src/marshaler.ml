@@ -2,7 +2,7 @@ open Jingoo
 open Jg_types
 open Marshaler_lib
 
-let marshal verbose env file =
+let marshal dump verbose env file =
   inline_const_cnt := 0 ;
   inline_trans_cnt := 0 ;
   preapply_cnt := 0 ;
@@ -40,6 +40,13 @@ let marshal verbose env file =
          |> concat
        in
        let file_out = file ^ "." ^ lang in
+       if dump then begin
+         let out = open_out @@ file_out ^ ".dump" in
+         output_string out @@ Jg_types.show_ast ast ;
+         output_char out '\n' ;
+         flush out ;
+         close_out out
+       end ;
        let ch_out = open_out_bin file_out in
        Marshal.to_channel ch_out ast [] ;
        if verbose then print_string @@ " " ^ lang ;
@@ -80,9 +87,9 @@ let ls dir filter =
   in
   loop [] [dir]
 
-let compile_dir verbose ext dir env =
+let compile_dir dump verbose ext dir env =
   let files = ls dir (fun f -> Filename.check_suffix f ext) in
-  List.iter (marshal verbose env) files
+  List.iter (marshal dump verbose env) files
 
 let () =
   Printexc.record_backtrace true ;
@@ -94,8 +101,10 @@ let () =
     let verbose = ref true in
     let ext = ref ".html.jingoo" in
     let fname = ref "" in
+    let dump = ref false in
     let speclist =
       [ ("--dir", Arg.Set_string dir, " Set the template dir (default is '.')")
+      ; ("--dump", Arg.Set dump, " output final ast in FILENAME.dump file")
       ; ("--quiet", Arg.Clear verbose, " Make it quiet (no output on stdout)")
       ; ( "--file-extension", Arg.Set_string ext
         , " Filter on file extension (default is .html.jingoo)")
@@ -112,8 +121,8 @@ let () =
       ; extensions = []
       ; strict_mode = false }
     in
-    if !fname = "" then compile_dir !verbose !ext !dir env
-    else marshal !verbose env !fname
+    if !fname = "" then compile_dir !dump !verbose !ext !dir env
+    else marshal !dump !verbose env !fname
   with e ->
     prerr_endline @@ Printexc.to_string e ;
     Printexc.print_backtrace stdout ;
