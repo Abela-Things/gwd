@@ -20,7 +20,7 @@ let open_templ file =
 
 let interp_templ ~models ast =
   let env = mk_env () in
-  let output x = Wserver.printf "%s" @@ Jg_runtime.string_of_tvalue x in
+  let output x = Wserver.print_string @@ Jg_runtime.string_of_tvalue x in
   let ctx = Jg_interp.init_context ~env ~models ~output () in
   let ast = Jg_interp.import_macros env ctx ast in
   ignore @@ List.fold_left (Jg_interp.eval_statement env) ctx ast
