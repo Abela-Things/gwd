@@ -155,7 +155,41 @@ let flatten stmts =
     | Statements stmts :: tl ->
       incr flatten_cnt ;
       loop (List.rev_append (loop [] stmts) acc) tl
-    | hd :: tl -> loop (hd :: acc) tl
+    | hd :: tl ->
+      let hd = match hd with
+      | TextStatement _
+      | ExpandStatement _
+      | IncludeStatement _
+      | RawIncludeStatement _
+      | ExtendsStatement _
+      | ImportStatement _
+      | FromImportStatement _
+      | SetStatement _
+      | NamespaceStatement _
+        as s -> s
+      | IfStatement (branches) ->
+        IfStatement (List.map (fun (e, ast) -> (e, loop [] ast)) branches)
+      | SwitchStatement (e, cases) ->
+        SwitchStatement (e, List.map (fun (e, ast) -> (e, loop [] ast)) cases)
+      | ForStatement (ids, e2, ast) ->
+        ForStatement (ids, e2, loop [] ast)
+      | BlockStatement (n, ast) ->
+        BlockStatement (n, loop [] ast)
+      | MacroStatement (n, args, ast) ->
+        MacroStatement (n, args, loop [] ast)
+      | FunctionStatement (n, args, ast) ->
+        FunctionStatement (n, args, loop [] ast)
+      | FilterStatement (n, ast) ->
+        FilterStatement (n, loop [] ast)
+      | CallStatement (n, a1, a2, ast) ->
+        CallStatement (n, a1, a2, loop [] ast)
+      | WithStatement (el, ast) ->
+        WithStatement (el, loop [] ast)
+      | AutoEscapeStatement (e, ast) ->
+        AutoEscapeStatement (e, loop [] ast)
+      | Statements _ -> assert false
+      in
+    loop (hd :: acc) tl
   in
   loop [] stmts
 
