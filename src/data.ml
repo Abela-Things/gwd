@@ -1152,6 +1152,32 @@ let alphabetic =
   in
   Tint (Utf8.compare (str a) (str b) )
 
+let module_CAST =
+  let string =
+    func_arg1_no_kw @@ function
+    | Tstr _ as s -> s
+    | Tnull -> Tstr ""
+    | Tint i -> Tstr (string_of_int i)
+    | Tfloat f -> Tstr (string_of_float f)
+    | Tbool b -> Tstr (string_of_bool b)
+    | x -> failwith_type_error_1 "CAST.string" x
+  in
+  let int =
+    func_arg1_no_kw @@ function
+    | Tint _ as i -> i
+    | Tnull -> Tint 0
+    | Tstr i -> Tint (int_of_string i)
+    | Tfloat f -> Tint (int_of_float f)
+    | Tbool true -> Tint 1
+    | Tbool false -> Tint 0
+    | x -> failwith_type_error_1 "CAST.int" x
+  in
+  Tpat begin function
+    | "int" -> int
+    | "string" -> string
+    | _ -> raise Not_found
+  end
+
 let default_env conf base (* p *) =
   let conf_env = mk_conf conf in
   let module_NAME = module_NAME base in
@@ -1169,6 +1195,7 @@ let default_env conf base (* p *) =
   :: ("conf", conf_env)
   :: ("TWIG", twig)
   :: ("LOG", log)
+  :: ("CAST", module_CAST)
   :: []
 
 let sandbox (conf : Config.config) base =
