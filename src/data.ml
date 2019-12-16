@@ -728,11 +728,16 @@ and mk_warning conf base =
     end
   in
   function
+  | Def.BigAgeBetweenSiblings (s1, s2, a) ->
+    Tset [ Tstr "BigAgeBetweenSiblings"
+         ; Tset [ unsafe_mk_person conf base s1
+                ; unsafe_mk_person conf base s2
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | Def.BigAgeBetweenSpouses (f, m, a) ->
     Tset [ Tstr "BigAgeBetweenSpouses"
          ; Tset [ unsafe_mk_person conf base f
                 ; unsafe_mk_person conf base m
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | BirthAfterDeath p ->
     Tset [ Tstr "BirthAfterDeath" ; Tset [ unsafe_mk_person conf base p] ]
   | IncoherentSex (p, i1, i2) ->
@@ -795,11 +800,11 @@ and mk_warning conf base =
   | DeadOld (p, a) ->
     Tset [ Tstr "DeadOld"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | DeadTooEarlyToBeFather (father, child) ->
     Tset [ Tstr "DeadTooEarlyToBeFather"
          ; Tset [ unsafe_mk_person conf base father
-                ; unsafe_mk_person conf base child ] ] (* gregorian?? *)
+                ; unsafe_mk_person conf base child ] ]
   | FEventOrder (p, e1, e2) ->
     Tset [ Tstr "FEventOrder"
          ; Tset [ unsafe_mk_person conf base p
@@ -827,6 +832,10 @@ and mk_warning conf base =
     Tset [ Tstr "MotherDeadAfterChildBirth"
          ; Tset [ unsafe_mk_person conf base p1
                 ; unsafe_mk_person conf base p2 ] ]
+  | OldForMarriage (p, a) ->
+    Tset [ Tstr "OldForMarriage"
+         ; Tset [ unsafe_mk_person conf base p
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | ParentBornAfterChild (p1, p2) ->
     Tset [ Tstr "ParentBornAfterChild"
          ; Tset [ unsafe_mk_person conf base p1
@@ -834,11 +843,11 @@ and mk_warning conf base =
   | ParentTooOld (p, a) ->
     Tset [ Tstr "ParentTooOld"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | ParentTooYoung (p, a) ->
     Tset [ Tstr "ParentTooYoung"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
   | PEventOrder (p, e1, e2) ->
     Tset [ Tstr "PEventOrder"
          ; Tset [ unsafe_mk_person conf base p
@@ -868,9 +877,10 @@ and mk_warning conf base =
   | YoungForMarriage (p, a) ->
     Tset [ Tstr "YoungForMarriage"
          ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ] (* gregorian?? *)
-
-  | PossibleDuplicateFam _ -> assert false (* FIXME *)
+                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+  | PossibleDuplicateFam (ifam1, ifam2) ->
+    Tset [ Tstr "PossibleDuplicateFam"
+         ; Tset  [ get_fam ifam1 ; get_fam ifam2 ] ]
 
 let module_OPT =
   let map = func_arg2_no_kw begin fun fn -> function
