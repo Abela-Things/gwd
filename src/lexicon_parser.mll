@@ -24,7 +24,62 @@ let eol = '\n'
 
 rule p_main acc = parse
   | ' '+ (line as t) eol
-      { p_main ((t, p_lang (String.contains t '/') [] lexbuf) :: acc) lexbuf }
+      { let split =
+          (* FIXME... *)
+          match t with
+          | "(date)"
+          | "(french revolution month)"
+          | "(hebrew month)"
+          | "(month)"
+          | "(week day)"
+          | "a 2nd cousin"
+          | "a 3rd cousin"
+          | "a cousin"
+          | "a descendant"
+          | "alive"
+          | "an ancestor"
+          | "and"
+          | "a %s cousin"
+          | "baptized"
+          | "born"
+          | "buried"
+          | "cremated"
+          | "died"
+          | "died young"
+          | "disappeared"
+          | "engaged%t to"
+          | "executed (legally killed)"
+          | "grand-parents"
+          | "great-grand-parents"
+          | "inversion done"
+          | "killed (in action)"
+          | "married%t to"
+          | "murdered"
+          | "next sibling"
+          | "nth"
+          | "nth (cousin)"
+          | "nth (generation)"
+          | "previous sibling"
+          | "relationship%t to"
+          | "the spouse"
+          | "would be his/her own ancestor"
+          | "died at an advanced age"
+          | "half siblings"
+          | "(short month)"
+            -> true
+          | "is born after his/her child"
+          | "loop in database: %s is his/her own ancestor"
+          | "marriage of %t after his/her death"
+          | "marriage of %t before his/her birth"
+          | "%t was witness after his/her death"
+          | "%t was witness before his/her birth"
+          | "%t's %s before his/her %s"
+          | "%t witnessed the %s after his/her death"
+          | "%t witnessed the %s before his/her birth"
+            -> false
+          | t -> String.contains t '/'
+        in
+        p_main ((t, p_lang split [] lexbuf) :: acc) lexbuf }
   | _
       { p_main acc lexbuf }
   | eof { acc }
