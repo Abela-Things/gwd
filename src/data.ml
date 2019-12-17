@@ -721,166 +721,166 @@ and mk_warning conf base =
   in
   let array_of_list_map : 'a 'b . ('a -> 'b) -> 'a list -> 'b array =
     fun fn l ->
-    if l = [] then [||] else begin
-      let a = Array.make (List.length l) (fn @@ List.hd l) in (* FIXME *)
-      List.iteri (fun i x -> a.(i) <- fn x) l ;
-      a
-    end
+      if l = [] then [||] else begin
+        let a = Array.make (List.length l) (fn @@ List.hd l) in (* FIXME *)
+        List.iteri (fun i x -> a.(i) <- fn x) l ;
+        a
+      end
   in
   function
   | Def.BigAgeBetweenSiblings (s1, s2, a) ->
     Tset [ Tstr "BigAgeBetweenSiblings"
-         ; Tset [ unsafe_mk_person conf base s1
-                ; unsafe_mk_person conf base s2
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base s1
+         ; unsafe_mk_person conf base s2
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | Def.BigAgeBetweenSpouses (f, m, a) ->
     Tset [ Tstr "BigAgeBetweenSpouses"
-         ; Tset [ unsafe_mk_person conf base f
-                ; unsafe_mk_person conf base m
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base f
+         ; unsafe_mk_person conf base m
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | BirthAfterDeath p ->
-    Tset [ Tstr "BirthAfterDeath" ; Tset [ unsafe_mk_person conf base p] ]
+    Tset [ Tstr "BirthAfterDeath" ; unsafe_mk_person conf base p]
   | IncoherentSex (p, i1, i2) ->
     Tset [ Tstr "BirthAfterDeath"
-         ; Tset [ unsafe_mk_person conf base p
-                ; Tint i1
-                ; Tint i2 ] ]
+         ; unsafe_mk_person conf base p
+         ; Tint i1
+         ; Tint i2 ]
   | ChangedOrderOfChildren (ifam, _descend, before, after) ->
     let (bef_d, aft_d) = Difference.f before after in
     Tset [ Tstr "ChangedOrderOfChildren"
-         ; Tset [ get_fam ifam
-                ; Tarray (Array.map (get_n_mk_person conf base) before)
-                ; Tarray (Array.map (get_n_mk_person conf base) after)
-                ; Tarray (Array.map box_bool bef_d)
-                ; Tarray (Array.map box_bool aft_d)
-                ] ]
+         ; get_fam ifam
+         ; Tarray (Array.map (get_n_mk_person conf base) before)
+         ; Tarray (Array.map (get_n_mk_person conf base) after)
+         ; Tarray (Array.map box_bool bef_d)
+         ; Tarray (Array.map box_bool aft_d)
+         ]
   | ChangedOrderOfMarriages (p, before, after) ->
     let (bef_d, aft_d) = Difference.f before after in
     Tset [ Tstr "ChangedOrderOfMarriages"
-         ; Tset [ unsafe_mk_person conf base p
-                ; Tarray (Array.map get_fam before)
-                ; Tarray (Array.map get_fam after)
-                ; Tarray (Array.map box_bool bef_d)
-                ; Tarray (Array.map box_bool aft_d)
-                ] ]
+         ; unsafe_mk_person conf base p
+         ; Tarray (Array.map get_fam before)
+         ; Tarray (Array.map get_fam after)
+         ; Tarray (Array.map box_bool bef_d)
+         ; Tarray (Array.map box_bool aft_d)
+         ]
   | ChangedOrderOfFamilyEvents (_ifam, before, after) ->
     let before = array_of_list_map (mk_fevent conf base) before in
     let after = array_of_list_map (mk_fevent conf base) after in
     let (bef_d, aft_d) = Difference.f before after in
     Tset [ Tstr "ChangedOrderOfFamilyEvents"
-         ; Tset [ Tarray before
-                ; Tarray after
-                ; Tarray (Array.map box_bool bef_d)
-                ; Tarray (Array.map box_bool aft_d)
-                ] ]
+         ; Tarray before
+         ; Tarray after
+         ; Tarray (Array.map box_bool bef_d)
+         ; Tarray (Array.map box_bool aft_d)
+         ]
   | ChangedOrderOfPersonEvents (_p, before, after) ->
     let before = array_of_list_map (mk_pevent conf base) before in
     let after = array_of_list_map (mk_pevent conf base) after in
     let (bef_d, aft_d) = Difference.f before after in
     Tset [ Tstr "ChangedOrderOfPersonEvents"
-         ; Tset [ Tarray before
-                ; Tarray after
-                ; Tarray (Array.map box_bool bef_d)
-                ; Tarray (Array.map box_bool aft_d)
-                ] ]
+         ; Tarray before
+         ; Tarray after
+         ; Tarray (Array.map box_bool bef_d)
+         ; Tarray (Array.map box_bool aft_d)
+         ]
   | ChildrenNotInOrder (ifam, _descend, elder, x) ->
     Tset [ Tstr "ChildrenNotInOrder"
-         ; Tset [ get_fam ifam
-                ; unsafe_mk_person conf base elder
-                ; unsafe_mk_person conf base x
-                ]
+         ; get_fam ifam
+         ; unsafe_mk_person conf base elder
+         ; unsafe_mk_person conf base x
          ]
   | CloseChildren (ifam, _descend, elder, x) ->
     Tset [ Tstr "CloseChildren"
-         ; Tset [ get_fam ifam
-                ; unsafe_mk_person conf base elder
-                ; unsafe_mk_person conf base x
-                ]
+         ; get_fam ifam
+         ; unsafe_mk_person conf base elder
+         ; unsafe_mk_person conf base x
          ]
   | DeadOld (p, a) ->
     Tset [ Tstr "DeadOld"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | DeadTooEarlyToBeFather (father, child) ->
     Tset [ Tstr "DeadTooEarlyToBeFather"
-         ; Tset [ unsafe_mk_person conf base father
-                ; unsafe_mk_person conf base child ] ]
+         ; unsafe_mk_person conf base father
+         ; unsafe_mk_person conf base child ]
   | FEventOrder (p, e1, e2) ->
     Tset [ Tstr "FEventOrder"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_fevent conf base e1
-                ; mk_fevent conf base e2 ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_fevent conf base e1
+         ; mk_fevent conf base e2 ]
   | FWitnessEventAfterDeath (p, e) ->
     Tset [ Tstr "FWitnessEventAfterDeath"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_fevent conf base e ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_fevent conf base e ]
   | FWitnessEventBeforeBirth (p, e) ->
     Tset [ Tstr "FWitnessEventBeforeBirth"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_fevent conf base e ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_fevent conf base e ]
   | IncoherentAncestorDate (p1, p2) ->
     Tset [ Tstr "IncoherentAncestorDate"
-         ; Tset [ unsafe_mk_person conf base p1
-                ; unsafe_mk_person conf base p2 ] ]
+         ; unsafe_mk_person conf base p1
+         ; unsafe_mk_person conf base p2 ]
   | MarriageDateAfterDeath p ->
     Tset [ Tstr "MarriageDateAfterDeath"
-         ; Tset [ unsafe_mk_person conf base p ] ]
+         ; unsafe_mk_person conf base p ]
   | MarriageDateBeforeBirth p ->
     Tset [ Tstr "MarriageDateBeforeBirth"
-         ; Tset [ unsafe_mk_person conf base p ] ]
+         ; unsafe_mk_person conf base p ]
   | MotherDeadAfterChildBirth (p1, p2) ->
     Tset [ Tstr "MotherDeadAfterChildBirth"
-         ; Tset [ unsafe_mk_person conf base p1
-                ; unsafe_mk_person conf base p2 ] ]
+         ; unsafe_mk_person conf base p1
+         ; unsafe_mk_person conf base p2 ]
   | OldForMarriage (p, a) ->
     Tset [ Tstr "OldForMarriage"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | ParentBornAfterChild (p1, p2) ->
     Tset [ Tstr "ParentBornAfterChild"
-         ; Tset [ unsafe_mk_person conf base p1
-                ; unsafe_mk_person conf base p2 ] ]
+         ; unsafe_mk_person conf base p1
+         ; unsafe_mk_person conf base p2 ]
   | ParentTooOld (p, a) ->
     Tset [ Tstr "ParentTooOld"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | ParentTooYoung (p, a) ->
     Tset [ Tstr "ParentTooYoung"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | PEventOrder (p, e1, e2) ->
     Tset [ Tstr "PEventOrder"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_pevent conf base e1
-                ; mk_pevent conf base e2 ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_pevent conf base e1
+         ; mk_pevent conf base e2 ]
   | PWitnessEventAfterDeath (p, e) ->
     Tset [ Tstr "PWitnessEventAfterDeath"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_pevent conf base e ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_pevent conf base e ]
   | PWitnessEventBeforeBirth (p, e) ->
     Tset [ Tstr "PWitnessEventBeforeBirth"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_pevent conf base e ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_pevent conf base e ]
   | TitleDatesError (p, t) ->
     Tset [ Tstr "PWitnessEventBeforeBirth"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_gen_title base t ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_gen_title base t ]
   | UndefinedSex p ->
     Tset [ Tstr "UndefinedSex"
-         ; Tset [ unsafe_mk_person conf base p ] ]
+         ; unsafe_mk_person conf base p ]
   | WitnessDateAfterDeath p ->
     Tset [ Tstr "WitnessDateAfterDeath"
-         ; Tset [ unsafe_mk_person conf base p ] ]
+         ; unsafe_mk_person conf base p ]
   | WitnessDateBeforeBirth p ->
     Tset [ Tstr "WitnessDateBeforeBirth"
-         ; Tset [ unsafe_mk_person conf base p ] ]
+         ; unsafe_mk_person conf base p ]
   | YoungForMarriage (p, a) ->
     Tset [ Tstr "YoungForMarriage"
-         ; Tset [ unsafe_mk_person conf base p
-                ; mk_date (Dgreg (a, Dgregorian) ) ] ]
+         ; unsafe_mk_person conf base p
+         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | PossibleDuplicateFam (ifam1, ifam2) ->
     Tset [ Tstr "PossibleDuplicateFam"
-         ; Tset  [ get_fam ifam1 ; get_fam ifam2 ] ]
+         ; get_fam ifam1
+         ; get_fam ifam2
+         ]
 
 let module_OPT =
   let map = func_arg2_no_kw begin fun fn -> function
