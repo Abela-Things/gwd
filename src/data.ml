@@ -1006,7 +1006,11 @@ let trans (conf : Config.config) =
   let trad ~kwargs s i =
     try
       let s = Hashtbl.find conf.lexicon s in
-      let t = Array.of_list @@ String.split_on_char '/' s in
+      let t =
+        if Lexicon_parser.need_split s
+        then Array.of_list @@ String.split_on_char '/' s
+        else [| s |]
+      in
       let t =
         Array.map (fun t -> Lexicon_parser.p_trad (Buffer.create 128) [] @@ Lexing.from_string t) t
       in
