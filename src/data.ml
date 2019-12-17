@@ -636,21 +636,25 @@ and mk_dmy { Def.day ; month ; year ; delta ; prec } =
       | _ -> raise Not_found
     )
 
-(* TODO: remove and replace with generic mk_event *)
-and mk_fevent conf base e =
-  Tpat (function "efam_name" -> Tstr (Util.string_of_fevent_name conf base e.Def.efam_name)
-               | _ -> raise Not_found)
+and mk_fevent ?spouse conf base e =
+  mk_event conf base
+    ( Fevent e.Def.efam_name
+    , e.efam_date
+    , e.efam_place
+    , e.efam_note
+    , e.efam_src
+    , e.efam_witnesses
+    , spouse)
 
-(* TODO: remove and replace with generic mk_event *)
 and mk_pevent conf base e =
-  let epers_name = Tstr (Util.string_of_pevent_name conf base e.Def.epers_name) in
-  Tpat (function "epers_name" -> epers_name
-               | "date" -> Tnull
-               | "family" -> Tnull
-               | "note" -> Tnull
-               | "place" -> Tnull
-               | "witnesses" -> Tnull
-               | _ -> raise Not_found)
+  mk_event conf base
+    ( Pevent e.Def.epers_name
+    , e.epers_date
+    , e.epers_place
+    , e.epers_note
+    , e.epers_src
+    , e.epers_witnesses
+    , None)
 
 and mk_gen_title base t =
   Tpat (function "t_ident" -> Tstr (Gwdb.sou base t.Def.t_ident)
