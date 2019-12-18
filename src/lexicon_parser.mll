@@ -109,18 +109,15 @@ and p_trad buffer acc = parse
       p_trad buffer acc lexbuf
     }
   | eof {
-      let base s =
-        let rec loop i =
-          if i = 0 then ""
-          else if s.[i] >= '0' && s.[i] <= '9' then loop (i - 1)
-          else String.sub s 0 (i + 1)
-        in loop (String.length s - 1)
+      let occ c acc =
+        List.fold_left (fun sum -> function Arg x when x.[0] = c -> sum + 1 | _ -> sum) 1 acc
       in
-      let occ s list = List.fold_left (fun sum -> function Arg x when base x = s -> sum + 1 | _ -> sum) 1 list in
       let rec loop acc = function
         | Arg hd :: tl ->
-          let occ = occ hd tl in
-          if occ = 1 && not (List.exists (function Arg s -> base s = hd | _ -> false) acc)
+          let c = hd.[0] in
+          let occ = occ c tl in
+          if occ = 1
+          && not (List.exists (function Arg s -> s.[0] = c | _ -> false) acc)
           then loop (Arg hd :: acc) tl
           else loop (Arg (hd ^ string_of_int occ) :: acc) tl
         | hd :: tl -> loop (hd :: acc) tl
