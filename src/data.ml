@@ -732,11 +732,6 @@ and mk_warning conf base =
       end
   in
   function
-  | Def.BigAgeBetweenSiblings (s1, s2, a) ->
-    Tset [ Tstr "BigAgeBetweenSiblings"
-         ; unsafe_mk_person conf base s1
-         ; unsafe_mk_person conf base s2
-         ; mk_date (Dgreg (a, Dgregorian) ) ]
   | Def.BigAgeBetweenSpouses (f, m, a) ->
     Tset [ Tstr "BigAgeBetweenSpouses"
          ; unsafe_mk_person conf base f
@@ -795,6 +790,12 @@ and mk_warning conf base =
          ]
   | CloseChildren (ifam, _descend, elder, x) ->
     Tset [ Tstr "CloseChildren"
+         ; get_fam ifam
+         ; unsafe_mk_person conf base elder
+         ; unsafe_mk_person conf base x
+         ]
+  | DistantChildren (ifam, elder, x) ->
+    Tset [ Tstr "DistantChildren"
          ; get_fam ifam
          ; unsafe_mk_person conf base elder
          ; unsafe_mk_person conf base x
