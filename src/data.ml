@@ -788,17 +788,17 @@ and mk_warning conf base =
          ; unsafe_mk_person conf base elder
          ; unsafe_mk_person conf base x
          ]
-  | CloseChildren (ifam, _descend, elder, x) ->
+  | CloseChildren (ifam, c1, c2) ->
     Tset [ Tstr "CloseChildren"
          ; get_fam ifam
-         ; unsafe_mk_person conf base elder
-         ; unsafe_mk_person conf base x
+         ; unsafe_mk_person conf base c1
+         ; unsafe_mk_person conf base c2
          ]
-  | DistantChildren (ifam, elder, x) ->
+  | DistantChildren (ifam, c1, c2) ->
     Tset [ Tstr "DistantChildren"
          ; get_fam ifam
-         ; unsafe_mk_person conf base elder
-         ; unsafe_mk_person conf base x
+         ; unsafe_mk_person conf base c1
+         ; unsafe_mk_person conf base c2
          ]
   | DeadOld (p, a) ->
     Tset [ Tstr "DeadOld"
