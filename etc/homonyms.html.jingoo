@@ -4,16 +4,13 @@
 <html>
 
 <div id="List des homonymes">
-<ul>
-{%- for plist in homonyms -%}
-  <li>
-  {%- for p in plist -%}
-    {%- if loop.first -%}
-      {{ p.first_name }} {{ p.surname }}, {{ length(plist) }} homonymes.
-      <ul>
-    {%- endif -%}
-      <li>
 
+Homonyms starting on this page ? {{ is_starting }} <br>
+{{ homonym_count }} homonyms found on this tree <br>
+
+<ul>
+{%- for p in homonyms -%}
+  <li>
     {%--%}<a href="{{ person_href (p) }}">
       {%- if particle -%}{{ NAME.without_particle (p.surname) }} ({{ particle }}) {{ p.first_name }}
       {% else %}{{ p.surname }} {{ p.first_name }}{% endif %}
@@ -27,12 +24,35 @@
       , &amp; {% if loop.length > 1 %} {{ loop.index }}{% endif %}
       {{ f.spouse.first_name }}.{{ f.spouse.occ }} {{ f.spouse.surname }}{{ f.spouse.date }}
     {%- endfor -%}
-
-      </li>
-  {%- endfor -%}
-      </ul> <br>
   </li>
 {%- endfor -%}
 </ul>
+
+{%- if page_num > 1 -%}
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="HOMONYMS">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="hidden" value="{{page_num - 1}}">
+  <input type="submit" value="<">
+</form>
+{%- endif -%}
+
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="HOMONYMS">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="number" min="0" max="{{page_count}}" value="{{page_num}}" style="float:left;width:auto;height:auto">
+  / {{page_count}}
+  <input type="submit" value="Go">
+</form>
+
+{%- if page_num < page_count -%}
+<form action method="get" style="float: left;display:inline-block">
+  <input name="m" type="hidden" value="HOMONYMS">
+  <input name="sz" type="hidden" value="{{page_size}}">
+  <input name="pg" type="hidden" value="{{page_num + 1}}">
+  <input type="submit" value=">">
+</form>
+{%- endif -%}
+
 </div>
 
