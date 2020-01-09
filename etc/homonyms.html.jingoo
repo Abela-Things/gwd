@@ -3,27 +3,56 @@
 
 <html>
 
-<div id="List des homonymes">
+<div id="Liste des homonyms">
 
-Homonyms starting on this page ? {{ is_starting }} <br>
 {{ homonym_count }} homonyms found on this tree <br>
 
+{%- set ns = namespace (count=0) -%}
+
 <ul>
-{%- for p in homonyms -%}
+{%- for plist in homonyms -%}
   <li>
-    {%--%}<a href="{{ person_href (p) }}">
-      {%- if particle -%}{{ NAME.without_particle (p.surname) }} ({{ particle }}) {{ p.first_name }}
-      {% else %}{{ p.surname }} {{ p.first_name }}{% endif %}
-    {%--%}</a>
-    {%- if p.dates %} {{ p.dates }}{% endif -%}
-    {%- if p.father and p.mother %},
-      {{ trans_a_of_b ( ('son/daughter/child'|trans(p.sex))
-      , (person_text(p.father) + ' &amp; ' + person_text(p.mother)) ) }}
+  {%- for p in plist -%}
+    {%- if loop.first -%}
+    {%- set merge_link = "<a href=\"" + env.prefix + "m=MRG;i=" +  p.iper + "\">"-%}
+      {%- if ns.count < hidden_count -%}
+        {{ p.first_name }} {{ p.surname }}, {{merge_link}}{{ length(plist) }} homonyms</a>, {{hidden_count}} can be found in the previous page.
+
+      {%- elif ns.count + length(plist) - hidden_count > page_size -%}
+        {{ p.first_name }} {{ p.surname }}, {{merge_link}}{{ length(plist) }} homonyms</a>, {{length(plist) - page_size + ns.count - hidden_count}} can be found in the next page.
+
+      {%- else -%}
+        {{ p.first_name }} {{ p.surname }}, {{merge_link}}{{ length(plist) }} homonyms</a>.
+
+      {%- endif -%}
+        <ul>
     {%- endif -%}
-    {%- for f in p.families %}
-      , &amp; {% if loop.length > 1 %} {{ loop.index }}{% endif %}
-      {{ f.spouse.first_name }}.{{ f.spouse.occ }} {{ f.spouse.surname }}{{ f.spouse.date }}
-    {%- endfor -%}
+
+    {%- if ns.count >= hidden_count && ns.count - hidden_count < page_size -%}
+        <li>
+      {%--%} <a href="{{env.prefix}}{{p.access}}">
+      {{p.iper}}
+        {%- if particle -%}
+          {{ p.first_name }} ({{ particle }}) {{ NAME.without_particle (p.surname) }}
+        {% else %}
+          {{ p.first_name }} {{ p.surname }} {% endif %}
+      {%--%}</a>
+      {%- if p.dates %} {{ p.dates }}{% endif -%}
+      {%- if p.father and p.mother %},
+        {{ trans_a_of_b ( ('son/daughter/child'|trans(p.sex))
+        , (person_text(p.father) + ' &amp; ' + person_text(p.mother)) ) }}
+      {%- endif -%}
+      {%- for f in p.families %}
+        , &amp; {% if loop.length > 1 %} {{ loop.index }}{% endif %}
+        {{ f.spouse.first_name }}.{{ f.spouse.occ }} {{ f.spouse.surname }}{{ f.spouse.date }}
+      {%- endfor -%}
+     
+     
+        </li>
+    {%- endif -%}
+    {%- set ns.count = ns.count + 1 -%}
+  {%- endfor -%}
+      </ul> <br>
   </li>
 {%- endfor -%}
 </ul>
@@ -40,7 +69,7 @@ Homonyms starting on this page ? {{ is_starting }} <br>
 <form action method="get" style="float: left;display:inline-block">
   <input name="m" type="hidden" value="HOMONYMS">
   <input name="sz" type="hidden" value="{{page_size}}">
-  <input name="pg" type="number" min="0" max="{{page_count}}" value="{{page_num}}" style="float:left;width:auto;height:auto">
+  <input name="pg" type="number" min="1" max="{{page_count}}" value="{{page_num}}" style="float:left;width:auto;height:auto">
   / {{page_count}}
   <input type="submit" value="Go">
 </form>

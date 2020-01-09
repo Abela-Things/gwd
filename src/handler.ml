@@ -7,7 +7,7 @@ open Jg_types
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = 0xABE1A
+let homonyms_magic = 0xABE1A2
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
@@ -25,47 +25,56 @@ let is_cache_homonyms_uptodate conf base =
   with
     Unix.Unix_error _ -> false
 
-let read_cache_homonyms conf base page size =
+let read_cache_homonyms conf base page_num size =
   let cache_filename = homonyms_file conf in
   let ic = Secure.open_in_bin cache_filename in
   let _ = input_binary_int ic in (* ignoring magic number *)
   let h_count = input_binary_int ic in
   let page_count = h_count / size + if h_count mod size == 0 then 0 else 1 in
-  let page = min (page_count - 1) @@ max 0 page in
-  let start_idx = page * size in
+  let page_num = min (page_count - 1) @@ max 0 page_num in
+  let start_idx = page_num * size in
   let size = if (start_idx + size > h_count) then (h_count - start_idx) else size in
-  let rec find_homonym_idx total =
-    let offset = input_binary_int ic in
+  let rec get_first_homonym_idx idx =
+    let _ = input_binary_int ic in
     let len = input_binary_int ic in
-    if len + total <= start_idx then find_homonym_idx (len + total)
-    else offset, total
+    if len + idx <= start_idx then get_first_homonym_idx (len + idx)
+    else idx
   in
-  let offset, curr_idx = find_homonym_idx 0 in
-  seek_in ic offset;
-  let is_starting = (curr_idx == start_idx) in
-  let rec loop = function
-      | idx when idx == start_idx -> ()
-      | idx ->  
-        let _ = input_value ic in 
-        loop (idx + 1)
+  let curr_idx = get_first_homonym_idx 0 in
+  seek_in ic (pos_in ic - 8);
+  let hidden_start_count = start_idx - curr_idx in
+  let cache_homonyms =
+    let rec get_curr_homonym len = match len with
+      | 0 -> []
+      | _ ->
+        let iper : iper = input_value ic in
+        (Data.unsafe_mk_person conf base @@ Gwdb.poi base iper) :: get_curr_homonym (len - 1)
+    in
+    let rec get_homonyms page_idx =
+      if page_idx - hidden_start_count >= size then
+        []
+      else
+        begin
+        let offset = input_binary_int ic in
+        let len = input_binary_int ic in
+        let off_position = pos_in ic in
+        seek_in ic offset;
+        let homonym = get_curr_homonym len in
+        seek_in ic off_position;
+        Tlist homonym :: (get_homonyms (page_idx + len))
+        end
+    in
+    get_homonyms 0
   in
-  loop curr_idx ;
-  let rec get_n_ipers n =
-    match n with
-    | 0 -> []
-    | _ -> 
-      let i : iper = input_value ic in
-      let person = Data.unsafe_mk_person conf base @@ Gwdb.poi base i in
-      person :: get_n_ipers (n - 1)
-  in
-  let result = get_n_ipers size in
   close_in ic;
   Printf.printf "homonyms cache red!\n%!";
-  result, is_starting, h_count, page_count, page
+  Printf.printf "homonyms groups : %d, page_num size : %d \n%!" (List.length cache_homonyms) size;
+  cache_homonyms, hidden_start_count, h_count, page_count, page_num
 
 type person_hash_table = ((string * string), person list) Hashtbl.t
 
 let build_cache_homonyms conf base =
+  Printf.printf "building cache_homonyms...\n%!";
   let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
   Gwdb.load_persons_array base ;
   Gwdb.load_strings_array base ;
@@ -100,7 +109,7 @@ let build_cache_homonyms conf base =
   in
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
-  output_binary_int oc homonyms_magic;
+  output_binary_int oc homonyms_magic; (* TODO only write magic number if building happened correctly *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
   let idx_offset = pos_out oc in
   List.iter (fun _ ->
@@ -120,10 +129,14 @@ let build_cache_homonyms conf base =
         output_binary_int oc curr_count; (* write size of the current homonym group *)
         let idx_offset = pos_out oc in
         seek_out oc h_offset;
-        List.iter (fun p -> output_value oc (Gwdb.get_iper p)) hd; (* write homonym group *)
+        List.iter (fun p ->
+          Printf.printf "getting iper%!";
+          Printf.printf "of %s %s\n%!" (Ezgw.Person.first_name base p) (Ezgw.Person.surname base p) ;
+          output_value oc (Gwdb.get_iper p)) hd; (* write homonym group *)
         curr_count + output_homonyms tl idx_offset
   in
   let total_count = output_homonyms sorted_homonyms idx_offset in
+  Printf.printf "Writing cache_homonym size (%d)...\n%!" total_count;
   seek_out oc 4;
   output_binary_int oc total_count;
   Gwdb.clear_persons_array base ;
@@ -683,8 +696,8 @@ let handler =
           let page = (Opt.default 0 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 10 @@ Util.p_getint conf.env "sz" in
           if not (is_cache_homonyms_uptodate conf base) then build_cache_homonyms conf base;
-          let homonyms, is_starting, h_count, page_count, page = read_cache_homonyms conf base page size in
-          let models = ("is_starting", Tbool is_starting)
+          let homonyms, hidden_count, h_count, page_count, page = read_cache_homonyms conf base page size in
+          let models = ("hidden_count", Tint hidden_count)
                     :: ("homonym_count", Tint h_count)
                     :: ("homonyms", Tlist homonyms)
                     :: ("page_num", Tint (page + 1))
@@ -697,5 +710,5 @@ let handler =
 
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
-
   }
+
