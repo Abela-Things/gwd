@@ -354,6 +354,7 @@ and mk_related conf base acc =
 and mk_witness_kind = function
   | Def.Witness -> Tstr "WITNESS"
   | Def.Witness_GodParent -> Tstr "WITNESS_GODPARENT"
+  | Def.Witness_Officer -> Tstr "WITNESS_OFFICER"
 
 and mk_event conf base d =
   let module E = Ezgw.Event in
