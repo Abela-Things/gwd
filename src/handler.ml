@@ -130,18 +130,16 @@ let build_cache_homonyms conf base =
   in
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
-  output_binary_int oc homonyms_magic; (* TODO only write magic number if building happened correctly *)
+  output_binary_int oc homonyms_magic; 
   output_binary_int oc 0 ; (* empty space to write total_count later *)
   let idx_offset = pos_out oc in
   List.iter (fun _ ->
-      (* FIXME This part could be ignored if we knew the
-      number of homonyms and the number of groups. *)
       output_binary_int oc 0;
       output_binary_int oc 0;
     ) sorted_homonyms;
-  let rec output_homonyms h_list idx_offset =
+  let rec output_homonyms acc h_list idx_offset =
     match h_list with
-    | [] -> 0
+    | [] -> acc
     | hd :: tl ->
         let curr_count = List.length hd in
         let h_offset = pos_out oc in (*save current offset *)
@@ -151,17 +149,14 @@ let build_cache_homonyms conf base =
         let idx_offset = pos_out oc in
         seek_out oc h_offset;
         List.iter (fun p ->
-          Printf.printf "getting iper%!";
-          Printf.printf "of %s %s\n%!" (Ezgw.Person.first_name base p) (Ezgw.Person.surname base p) ;
           output_value oc (Gwdb.get_iper p)) hd; (* write homonym group *)
-        curr_count + output_homonyms tl idx_offset
+        output_homonyms (acc + curr_count) tl idx_offset
   in
-  let total_count = output_homonyms sorted_homonyms idx_offset in
-  Printf.printf "Writing cache_homonym size (%d)...\n%!" total_count;
-  seek_out oc 4;
-  output_binary_int oc total_count;
+  let total_count = output_homonyms 0 sorted_homonyms idx_offset in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
+  seek_out oc 4;
+  output_binary_int oc total_count;
   Printf.printf "cache_homonyms built!\n%!";
   close_out oc
 
