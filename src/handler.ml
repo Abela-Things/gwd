@@ -28,28 +28,27 @@ let lower_fst =
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = 0xABE1A
+let homonyms_magic = "GW_HOMONYMS_0001"
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
-  let res = (input_binary_int ic) == homonyms_magic in
+  let res = ((really_input_string ic (String.length homonyms_magic)) = homonyms_magic) in
   close_in ic;
   res
 
-let is_cache_homonyms_uptodate conf base =
-  let cache_path = homonyms_file conf in
+let is_cache_uptodate base cache_path =
   try
     let cache_stat = Unix.stat (cache_path) in
     let cache_timeof_modif = cache_stat.Unix.st_mtime in
     let base_timeof_modif = Gwdb.date_of_last_change base in
-    (base_timeof_modif < cache_timeof_modif) && check_homonyms_magic conf
+    (base_timeof_modif < cache_timeof_modif)
   with
     Unix.Unix_error _ -> false
 
 let read_cache_homonyms conf base page_num size =
   let cache_filename = homonyms_file conf in
   let ic = Secure.open_in_bin cache_filename in
-  let _ = input_binary_int ic in (* ignoring magic number *)
+  seek_in ic (String.length homonyms_magic); (* ignoring magic number *)
   let h_count = input_binary_int ic in
   let page_count = h_count / size + if h_count mod size == 0 then 0 else 1 in
   let page_num = min (page_count - 1) @@ max 0 page_num in
@@ -89,11 +88,37 @@ let read_cache_homonyms conf base page_num size =
   in
   close_in ic;
   Printf.printf "homonyms cache red!\n%!";
-  Printf.printf "homonyms groups : %d, page_num size : %d \n%!" (List.length cache_homonyms) size;
   cache_homonyms, hidden_start_count, h_count, page_count, page_num
 
 type person_hash_table = ((string * string), person list) Hashtbl.t
 
+(*
+  Cache file for storing homonyms that were found in a given tree.
+
+  file name : cache_homonyms
+
+  Here, a homonym group is a group of 2 or more persons who have the same first name and last name.
+
+  file structure :
+    magic number                                        : string defined in variable homonyms_magic
+    total number of saved iper in this file             : binary_int
+
+    offset of starting homonym group                    : binary_int
+    size of current homonym group                       : binary_int
+    ...
+    offset of starting homonym group                    : binary_int
+    size of current homonym group                       : binary_int
+
+    iper                                                : marshalled iper
+    ...
+    iper                                                : marshalled iper
+
+    \0
+
+  FIXME : It would be simpler to marshall lists of iper directly instead of having
+  to read an offset, a size and then the contents of each groups if it is compatible with later
+  developments.
+*)
 let build_cache_homonyms conf base =
   Printf.printf "building cache_homonyms...\n%!";
   let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
@@ -130,7 +155,7 @@ let build_cache_homonyms conf base =
   in
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
-  output_binary_int oc homonyms_magic; 
+  seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
   let idx_offset = pos_out oc in
   List.iter (fun _ ->
@@ -155,7 +180,8 @@ let build_cache_homonyms conf base =
   let total_count = output_homonyms 0 sorted_homonyms idx_offset in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
-  seek_out oc 4;
+  seek_out oc 0;
+  output_string oc homonyms_magic;
   output_binary_int oc total_count;
   Printf.printf "cache_homonyms built!\n%!";
   close_out oc
@@ -164,16 +190,19 @@ let list_ind_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) @@
   if conf.wizard || conf.friend then "cache_list_ind_friend" else "cache_list_ind_visitor"
 
-let is_cache_iper_inorder_uptodate conf base =
-  let cache_path = list_ind_file conf in
-  try
-    let cache_stat = Unix.stat (cache_path) in
-    let cache_timeof_modif = cache_stat.Unix.st_mtime in
-    let base_timeof_modif = Gwdb.date_of_last_change base in
-    (base_timeof_modif < cache_timeof_modif)
-  with
-    Unix.Unix_error _ -> false
+(*
+  Cache file for storing every person's iper in alphabetical order.
 
+  file name : cache_list_ind_friend and cache_list_ind_visitor
+
+  Both files are generated at the same time and accessed in funtion of the rights of the viewer.
+
+  file structure:
+    count                                               : binary_int
+    pairs of letter and corresponding index             : marshalled (string * int) list
+    iper offset list                                    : binary_int
+    iper list                                           : marshalled iper
+*)
 let build_cache_iper_inorder conf base =
   let module PerSet =
     Set.Make (struct
@@ -698,7 +727,7 @@ let handler =
         begin
           let num = (Opt.default 1 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 2000 @@ Util.p_getint conf.env "sz" in
-          if not (is_cache_iper_inorder_uptodate conf base)
+          if not (is_cache_uptodate base (list_ind_file conf))
           then build_cache_iper_inorder conf base ;
           let page_count, letters, ipers, num =
             read_cache_iper_inorder conf num size
@@ -751,8 +780,9 @@ let handler =
       | "HOMONYMS" ->
         begin
           let page = (Opt.default 0 @@ Util.p_getint conf.env "pg") - 1 in
-          let size = Opt.default 10 @@ Util.p_getint conf.env "sz" in
-          if not (is_cache_homonyms_uptodate conf base) then build_cache_homonyms conf base;
+          let size = Opt.default 200 @@ Util.p_getint conf.env "sz" in
+          if not (is_cache_uptodate base (homonyms_file conf)
+            && (check_homonyms_magic conf)) then build_cache_homonyms conf base;
           let homonyms, hidden_count, h_count, page_count, page = read_cache_homonyms conf base page size in
           let models = ("hidden_count", Tint hidden_count)
                     :: ("homonym_count", Tint h_count)
