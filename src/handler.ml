@@ -87,10 +87,7 @@ let read_cache_homonyms conf base page_num size =
     get_homonyms 0
   in
   close_in ic;
-  Printf.printf "homonyms cache red!\n%!";
   cache_homonyms, hidden_start_count, h_count, page_count, page_num
-
-type person_hash_table = ((string * string), person list) Hashtbl.t
 
 (*
   Cache file for storing homonyms that were found in a given tree.
@@ -121,52 +118,47 @@ type person_hash_table = ((string * string), person list) Hashtbl.t
 *)
 let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
-  Printf.printf "building cache_homonyms...\n%!";
-  let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
+  let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
   Gwdb.load_persons_array base ;
   Gwdb.load_strings_array base ;
-  Gwdb.Collection.fold (fun _ p ->
+  Gwdb.Collection.iter begin fun p ->
     (* FIXME: stop checking is_empty_name when possible *)
     if not (Util.is_empty_name p) then
-      let first_name = Ezgw.Person.first_name base p in
-      let surname = Ezgw.Person.surname base p in
-      match Hashtbl.find_opt person_hash (first_name, surname) with
-        None ->
-          Hashtbl.add person_hash (first_name, surname) [p]
-      | Some pers ->
-          Hashtbl.replace person_hash (first_name, surname) (p :: pers)
-  ) () (Gwdb.persons base);
-  let compare_homonyms h1 h2 =
-    (* FIXME! replace this by the new comparison function when merging with Geneanet's version.*)
-    let compare_names p1 p2 =
-      match Gutil.alphabetic_utf_8
-          (Util.name_key base @@ Ezgw.Person.surname base p1)
-          (Util.name_key base @@ Ezgw.Person.surname base p2)
-      with
-      | 0 -> Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2)
-      | x -> x
-    in compare_names (List.hd h1) (List.hd h2)
-  in
-  let sorted_homonyms = List.sort compare_homonyms
-    (Hashtbl.fold (fun _ sames homonyms ->
-      if List.length sames > 1 then 
-          sames :: homonyms
-      else homonyms)
-    person_hash [])
+      let k = (Ezgw.Person.surname base p, Ezgw.Person.first_name base p) in
+      match Hashtbl.find_opt ht k with
+      | None -> Hashtbl.add ht k [ get_iper p ]
+      | Some pers -> Hashtbl.replace ht k (get_iper p :: pers)
+  end (Gwdb.persons base) ;
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
+  let sorted =
+    List.sort
+      begin fun ((a1, a2), _) ((b1, b2), _) ->
+        match Utf8.compare a1 b1 with
+        | 0 -> Utf8.compare a2 b2
+        | x -> x
+      end
+      begin
+        Hashtbl.fold begin fun k v acc ->
+          match v with
+          | [] | [_] -> acc
+          | _ -> (k, v) :: acc
+        end ht []
+      end
   in
   let cache_filename = homonyms_file conf in
   let oc = Secure.open_out_bin cache_filename in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
   let idx_offset = pos_out oc in
-  List.iter (fun _ ->
-      output_binary_int oc 0;
-      output_binary_int oc 0;
-    ) sorted_homonyms;
+  List.iter begin fun _ ->
+    output_binary_int oc 0;
+    output_binary_int oc 0;
+  end sorted ;
   let rec output_homonyms acc h_list idx_offset =
     match h_list with
     | [] -> acc
-    | hd :: tl ->
+    | (_, hd) :: tl ->
         let curr_count = List.length hd in
         let h_offset = pos_out oc in (*save current offset *)
         seek_out oc idx_offset;
@@ -174,17 +166,13 @@ let build_cache_homonyms conf base =
         output_binary_int oc curr_count; (* write size of the current homonym group *)
         let idx_offset = pos_out oc in
         seek_out oc h_offset;
-        List.iter (fun p ->
-          output_value oc (Gwdb.get_iper p)) hd; (* write homonym group *)
+        List.iter (fun p -> output_value oc p) hd; (* write homonym group *)
         output_homonyms (acc + curr_count) tl idx_offset
   in
-  let total_count = output_homonyms 0 sorted_homonyms idx_offset in
-  Gwdb.clear_persons_array base ;
-  Gwdb.clear_strings_array base ;
+  let total_count = output_homonyms 0 sorted idx_offset in
   seek_out oc 0;
   output_string oc homonyms_magic;
   output_binary_int oc total_count;
-  Printf.printf "cache_homonyms built!\n%!";
   close_out oc
 
 let list_ind_file conf =
