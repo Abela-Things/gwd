@@ -599,20 +599,6 @@ let handler =
           Interp.render ~conf ~file:"list_ind" ~models
         end
 
-      | "WARNINGS" ->
-        begin
-          let ht = Hashtbl.create 1024 in
-          _bench __LOC__ begin fun () ->
-          Check.check_base base ignore (fun x -> Hashtbl.replace ht x ()) ignore end ;
-          let warnings = Hashtbl.fold begin fun w () acc ->
-              Data.mk_warning conf base w :: acc
-            end ht [] in
-          let models = ("warnings", Tlist warnings)
-                       :: Data.default_env conf base
-          in
-          _bench __LOC__ @@ fun () -> Interp.render ~conf ~file:"warnings" ~models
-        end
-
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
 
