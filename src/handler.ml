@@ -120,6 +120,7 @@ type person_hash_table = ((string * string), person list) Hashtbl.t
   developments.
 *)
 let build_cache_homonyms conf base =
+  _bench __LOC__ @@ fun () ->
   Printf.printf "building cache_homonyms...\n%!";
   let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
   Gwdb.load_persons_array base ;
