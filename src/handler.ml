@@ -125,8 +125,8 @@ let build_cache_homonyms conf base =
     (* FIXME: stop checking is_empty_name when possible *)
     if not (Util.is_empty_name p) then
       let k =
-        ( Utf8.lowercase @@ Ezgw.Person.surname base p
-        , Utf8.lowercase @@ Ezgw.Person.first_name base p )
+        ( Name.lower @@ Ezgw.Person.surname base p
+        , Name.lower @@ Ezgw.Person.first_name base p )
       in
       match Hashtbl.find_opt ht k with
       | None -> Hashtbl.add ht k [ get_iper p ]
