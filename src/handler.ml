@@ -28,7 +28,7 @@ let lower_fst =
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0001"
+let homonyms_magic = "GW_HOMONYMS_0002"
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
@@ -46,8 +46,7 @@ let is_cache_uptodate base cache_path =
     Unix.Unix_error _ -> false
 
 let read_cache_homonyms conf base page_num size =
-  let cache_filename = homonyms_file conf in
-  let ic = Secure.open_in_bin cache_filename in
+  let ic = Secure.open_in_bin (homonyms_file conf) in
   seek_in ic (String.length homonyms_magic); (* ignoring magic number *)
   let h_count = input_binary_int ic in
   let page_count = h_count / size + if h_count mod size == 0 then 0 else 1 in
@@ -136,13 +135,12 @@ let build_cache_homonyms conf base =
           Hashtbl.replace person_hash (first_name, surname) (p :: pers)
   ) () (Gwdb.persons base);
   let compare_homonyms h1 h2 =
-    (* FIXME! replace this by the new comparison function when merging with Geneanet's version.*)
     let compare_names p1 p2 =
-      match Gutil.alphabetic_utf_8
+      match Utf8.compare
           (Util.name_key base @@ Ezgw.Person.surname base p1)
           (Util.name_key base @@ Ezgw.Person.surname base p2)
       with
-      | 0 -> Gutil.alphabetic_utf_8 (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2)
+      | 0 -> Utf8.compare (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2)
       | x -> x
     in compare_names (List.hd h1) (List.hd h2)
   in
@@ -153,8 +151,7 @@ let build_cache_homonyms conf base =
       else homonyms)
     person_hash [])
   in
-  let cache_filename = homonyms_file conf in
-  let oc = Secure.open_out_bin cache_filename in
+  let oc = Secure.open_out_bin (homonyms_file conf) in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
   let idx_offset = pos_out oc in
