@@ -28,7 +28,7 @@ let lower_fst =
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0002"
+let homonyms_magic = "GW_HOMONYMS_0005"
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
@@ -89,10 +89,30 @@ let read_cache_homonyms conf base page_num size =
   Printf.printf "homonyms cache red!\n%!";
   cache_homonyms, hidden_start_count, h_count, page_count, page_num
 
-type person_hash_table = ((string * string), person list) Hashtbl.t
 
 (*
-  Cache file for storing homonyms that were found in a given tree.
+  Returns a person list consisting of every registered spouses for a given person.
+*)
+let get_person_spouses conf base p =
+  let rec loop i acc =
+    if i < Array.length (get_family p) then
+      let fam = foi base (get_family p).(i) in
+      let iconjoint = Gutil.spouse (get_iper p) fam in
+      let conjoint = Util.pget conf base iconjoint in
+      (* FIXME: stop checking is_empty_name when possible *)
+      if not (Util.is_empty_name conjoint) then
+        loop (i + 1) (conjoint :: acc)
+      else
+        loop (i + 1) acc
+    else
+      acc
+  in loop 0 []
+
+type homonyms_hashtbl = ((string * string), person list) Hashtbl.t
+type spouse_reverse_hashtbl = ((string * string), person list) Hashtbl.t
+
+(*
+  This function builds a cache file for storing homonyms that were found in a given tree.
 
   file name : cache_homonyms
 
@@ -120,7 +140,7 @@ type person_hash_table = ((string * string), person list) Hashtbl.t
 *)
 let build_cache_homonyms conf base =
   Printf.printf "building cache_homonyms...\n%!";
-  let (person_hash : person_hash_table) = Hashtbl.create (Gwdb.nb_of_persons base) in
+  let (homonym_table : homonyms_hashtbl) = Hashtbl.create (Gwdb.nb_of_persons base) in
   Gwdb.load_persons_array base ;
   Gwdb.load_strings_array base ;
   Gwdb.Collection.fold (fun _ p ->
@@ -128,28 +148,62 @@ let build_cache_homonyms conf base =
     if not (Util.is_empty_name p) then
       let first_name = Ezgw.Person.first_name base p in
       let surname = Ezgw.Person.surname base p in
-      match Hashtbl.find_opt person_hash (first_name, surname) with
+      match Hashtbl.find_opt homonym_table (first_name, surname) with
         None ->
-          Hashtbl.add person_hash (first_name, surname) [p]
+          Hashtbl.add homonym_table (first_name, surname) [p]
       | Some pers ->
-          Hashtbl.replace person_hash (first_name, surname) (p :: pers)
+          Hashtbl.replace homonym_table (first_name, surname) (p :: pers)
   ) () (Gwdb.persons base);
-  let compare_homonyms h1 h2 =
-    let compare_names p1 p2 =
-      match Utf8.compare
-          (Util.name_key base @@ Ezgw.Person.surname base p1)
-          (Util.name_key base @@ Ezgw.Person.surname base p2)
-      with
-      | 0 -> Utf8.compare (Ezgw.Person.surname base p1) (Ezgw.Person.surname base p2)
-      | x -> x
-    in compare_names (List.hd h1) (List.hd h2)
+  Hashtbl.filter_map_inplace (
+    fun (_, _) persons ->
+      if List.length persons < 2 then None
+      else Some persons
+  ) homonym_table ;
+  let compare_names p1 p2 =
+    match Utf8.compare
+        (Util.name_key base @@ Ezgw.Person.surname base p1)
+        (Util.name_key base @@ Ezgw.Person.surname base p2)
+    with
+    | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
+    | x -> x
   in
-  let sorted_homonyms = List.sort compare_homonyms
-    (Hashtbl.fold (fun _ sames homonyms ->
-      if List.length sames > 1 then 
-          sames :: homonyms
-      else homonyms)
-    person_hash [])
+  let module PerSet =
+    Set.Make (struct
+      type t = person
+      let compare p1 p2 = match compare_names p1 p2 with
+        | 0 -> Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+        | x -> x
+    end)
+  in
+  Hashtbl.filter_map_inplace (fun (_, _) persons ->
+    (* build spouse_table, it starts at two times the size of persons to not reallocate later
+       in most cases. *)
+    let (spouse_table : spouse_reverse_hashtbl) = Hashtbl.create (List.length persons) in
+    List.iter (fun p ->
+      List.iter (fun spouse ->
+        (* FIXME: stop checking is_empty_name when possible *)
+        if not (Util.is_empty_name spouse) then
+          let first_name = Ezgw.Person.first_name base spouse in
+          let surname = Ezgw.Person.surname base spouse in
+          match Hashtbl.find_opt spouse_table (first_name, surname) with
+            None ->
+              Hashtbl.add spouse_table (first_name, surname) [p]
+          | Some pers ->
+              Hashtbl.replace spouse_table (first_name, surname) (p :: pers)
+      ) (get_person_spouses conf base p) ;
+    ) persons ;
+    (* find homonyms in spouse_table, homonyms are spouse_table keys that have 2 or more values. *)
+    let couple_set = Hashtbl.fold (fun _ persons set ->
+      if (List.length persons) < 2 then set
+      else List.fold_left (fun set p -> PerSet.add p set) set persons
+    ) spouse_table PerSet.empty
+    in
+    if PerSet.cardinal couple_set < 2 then None
+    else Some (PerSet.elements couple_set)
+  ) homonym_table ;
+  let compare_homonyms h1 h2 = compare_names (List.hd h1) (List.hd h2) in
+  let homonyms = List.sort compare_homonyms
+    (Hashtbl.fold (fun _ sames all_homonyms -> sames :: all_homonyms) homonym_table [])
   in
   let oc = Secure.open_out_bin (homonyms_file conf) in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
@@ -158,7 +212,7 @@ let build_cache_homonyms conf base =
   List.iter (fun _ ->
       output_binary_int oc 0;
       output_binary_int oc 0;
-    ) sorted_homonyms;
+    ) homonyms;
   let rec output_homonyms acc h_list idx_offset =
     match h_list with
     | [] -> acc
@@ -174,7 +228,7 @@ let build_cache_homonyms conf base =
           output_value oc (Gwdb.get_iper p)) hd; (* write homonym group *)
         output_homonyms (acc + curr_count) tl idx_offset
   in
-  let total_count = output_homonyms 0 sorted_homonyms idx_offset in
+  let total_count = output_homonyms 0 homonyms idx_offset in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
   seek_out oc 0;
@@ -331,7 +385,7 @@ let handler =
       let max_answers = try int_of_string @@ List.assoc "max" conf.env with _ -> 100 in
       let (list, _len) = AdvSearchOk.advanced_search conf base max_int in
       let searching_fields =
-        let s = AdvSearchOk.searching_fields conf in
+        let s = AdvSearchOk.searching_fields conf base in
         if s = "" then ""
         else if String.get s (String.length s - 1) == ','
         then String.sub s 0 (String.length s - 1)
