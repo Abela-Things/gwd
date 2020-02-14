@@ -177,7 +177,10 @@ let build_cache_homonyms conf base =
                 Hashtbl.replace spouse_table k (p :: pers)
         ) (get_person_spouses conf base p) ;
       ) persons ;
-      (* spouse_table links all different spouses with their spouses that are present in persons. *)
+      (*
+        spouse_table links each spouse name of the current homonym group to a list of the persons
+        they are married to.
+      *)
       let module PerSet =
         Set.Make (struct
           type t = person
@@ -186,6 +189,10 @@ let build_cache_homonyms conf base =
             | x -> x
         end)
       in
+      (*
+        A Set is used along with the list couple_list to ensure that there is no duplicates and
+        that the list is maintained in the order it was built in.
+      *)
       let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
         if (List.length persons) < 2 then (l, s)
         else List.fold_left (fun (l, s) p ->
@@ -200,7 +207,7 @@ let build_cache_homonyms conf base =
       else Some couple_list
   ) homonym_table ;
   let compare_homonyms h1 h2 = compare_names (List.hd h1) (List.hd h2) in
-  let homonyms = List.sort compare_homonyms (*TODO sort with names directly instead. *)
+  let homonyms = List.sort compare_homonyms
     (Hashtbl.fold (fun _ sames all_homonyms -> sames :: all_homonyms) homonym_table [])
   in
   Gwdb.clear_persons_array base ;
