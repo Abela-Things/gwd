@@ -28,7 +28,7 @@ let lower_fst =
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0001"
+let homonyms_magic = "GW_HOMONYMS_0011"
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
@@ -159,27 +159,40 @@ let build_cache_homonyms conf base =
     | x -> x
   in
   Hashtbl.filter_map_inplace (fun (_, _) persons ->
-    (* build spouse_table, it starts at two times the size of persons to not reallocate later
-       in most cases. *)
     let spouse_table = Hashtbl.create (List.length persons) in
     List.iter (fun p ->
       List.iter (fun spouse ->
         (* FIXME: stop checking is_empty_name when possible *)
         if not (Util.is_empty_name spouse) then
-          let first_name = Ezgw.Person.first_name base spouse in
-          let surname = Ezgw.Person.surname base spouse in
-          match Hashtbl.find_opt spouse_table (first_name, surname) with
+          let k =
+            ( Name.lower @@ Ezgw.Person.surname base spouse
+            , Name.lower @@ Ezgw.Person.first_name base spouse )
+          in
+          match Hashtbl.find_opt spouse_table k with
             None ->
-              Hashtbl.add spouse_table (first_name, surname) [p]
+              Hashtbl.add spouse_table k [p]
           | Some pers ->
-              Hashtbl.replace spouse_table (first_name, surname) (p :: pers)
+              Hashtbl.replace spouse_table k (p :: pers)
       ) (get_person_spouses conf base p) ;
     ) persons ;
-    (* find homonyms in spouse_table, homonyms are spouse_table keys that have 2 or more values. *)
-    let couple_list = Hashtbl.fold (fun _ persons l ->
-      if (List.length persons) < 2 then l
-      else List.fold_left (fun l p -> p :: l) l persons
-    ) spouse_table []
+    (* spouse_table links all different spouses with their spouses that are present in persons. *)
+    let module PerSet =
+      Set.Make (struct
+        type t = person
+        let compare p1 p2 = match compare_names p1 p2 with
+          | 0 -> Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+          | x -> x
+      end)
+    in
+    let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
+      if (List.length persons) < 2 then (l, s)
+      else List.fold_left (fun (l, s) p ->
+        if Option.is_none (PerSet.find_opt p s) then
+          p :: l, PerSet.add p s
+        else
+          l, s
+      ) (l, s) persons
+    ) spouse_table ([], PerSet.empty)
     in
     if List.length couple_list < 2 then None
     else Some couple_list
@@ -188,8 +201,6 @@ let build_cache_homonyms conf base =
   let homonyms = List.sort compare_homonyms (*TODO sort with names directly instead. *)
     (Hashtbl.fold (fun _ sames all_homonyms -> sames :: all_homonyms) homonym_table [])
   in
-
-
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
   let cache_filename = homonyms_file conf in
@@ -369,7 +380,7 @@ let handler =
       let max_answers = try int_of_string @@ List.assoc "max" conf.env with _ -> 100 in
       let (list, _len) = AdvSearchOk.advanced_search conf base max_int in
       let searching_fields =
-        let s = AdvSearchOk.searching_fields conf in
+        let s = AdvSearchOk.searching_fields conf base in
         if s = "" then ""
         else if String.get s (String.length s - 1) == ','
         then String.sub s 0 (String.length s - 1)
