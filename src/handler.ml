@@ -170,7 +170,7 @@ let handler =
       let max_answers = try int_of_string @@ List.assoc "max" conf.env with _ -> 100 in
       let (list, _len) = AdvSearchOk.advanced_search conf base max_int in
       let searching_fields =
-        let s = AdvSearchOk.searching_fields conf in
+        let s = AdvSearchOk.searching_fields conf base in
         if s = "" then ""
         else if String.get s (String.length s - 1) == ','
         then String.sub s 0 (String.length s - 1)
