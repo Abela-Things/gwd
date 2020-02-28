@@ -28,7 +28,7 @@ let lower_fst =
 let homonyms_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0013"
+let homonyms_magic = "GW_HOMONYMS_0016"
 
 let check_homonyms_magic conf =
   let ic = Secure.open_in_bin (homonyms_file conf) in
@@ -130,6 +130,7 @@ let get_person_spouses conf base p =
 
     \0
 
+
   FIXME : It would be simpler to marshall lists of iper directly instead of having
   to read an offset, a size and then the contents of each groups if it is compatible with later
   developments.
@@ -159,8 +160,10 @@ let build_cache_homonyms conf base =
     | x -> x
   in
   Hashtbl.filter_map_inplace (fun (_, _) persons ->
-    if List.length persons < 2 then None
-    else
+    if List.length persons < 2 then None else Some persons) homonym_table;
+
+  let filter_spouses ht = if Util.p_getenv conf.env "spouses" <> None then
+    Hashtbl.filter_map_inplace (fun (_, _) persons ->
       let spouse_table = Hashtbl.create (List.length persons) in
       List.iter (fun p ->
         List.iter (fun spouse ->
@@ -172,7 +175,7 @@ let build_cache_homonyms conf base =
             in
             match Hashtbl.find_opt spouse_table k with
               None ->
-                Hashtbl.add spouse_table k [p]
+                Hashtbl.add spouse_table k [ p ]
             | Some pers ->
                 Hashtbl.replace spouse_table k (p :: pers)
         ) (get_person_spouses conf base p) ;
@@ -205,10 +208,15 @@ let build_cache_homonyms conf base =
       in
       if List.length couple_list < 2 then None
       else Some couple_list
-  ) homonym_table ;
+    ) ht in
+
+  filter_spouses homonym_table;
   let compare_homonyms h1 h2 = compare_names (List.hd h1) (List.hd h2) in
   let homonyms = List.sort compare_homonyms
-    (Hashtbl.fold (fun _ sames all_homonyms -> sames :: all_homonyms) homonym_table [])
+    (Hashtbl.fold (fun _ sames all_homonyms ->
+      if List.length sames < 2 then all_homonyms
+      else sames :: all_homonyms
+    ) homonym_table [])
   in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
