@@ -25,13 +25,23 @@ let lower_fst =
     end ;
     Buffer.contents b
 
-let homonyms_file conf =
+let homonyms_main_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0016"
+let homonyms_subfile conf =
+  let filename = homonyms_main_file conf in
+  let filename = if Util.p_getenv conf.env "spouses" <> None
+    then String.concat "_" (filename :: ["spouses"])
+    else filename
+  in
+  if filename = homonyms_main_file conf
+    then String.concat "_" (filename :: ["default"])
+    else filename
+
+let homonyms_magic = "GW_HOMONYMS_0019"
 
 let check_homonyms_magic conf =
-  let ic = Secure.open_in_bin (homonyms_file conf) in
+  let ic = Secure.open_in_bin (homonyms_subfile conf) in
   let res = ((really_input_string ic (String.length homonyms_magic)) = homonyms_magic) in
   close_in ic;
   res
@@ -46,7 +56,7 @@ let is_cache_uptodate base cache_path =
     Unix.Unix_error _ -> false
 
 let read_cache_homonyms conf base page_num size =
-  let cache_filename = homonyms_file conf in
+  let cache_filename = homonyms_subfile conf in
   let ic = Secure.open_in_bin cache_filename in
   seek_in ic (String.length homonyms_magic); (* ignoring magic number *)
   let h_count = input_binary_int ic in
@@ -110,47 +120,41 @@ let get_person_spouses conf base p =
 (*
   This function builds a cache file for storing homonyms that were found in a given tree.
 
-  file name : cache_homonyms
-
-  Here, a homonym group is a group of 2 or more persons who have the same first name and last name.
-
   file structure :
-    magic number                                        : string defined in variable homonyms_magic
-    total number of saved iper in this file             : binary_int
-
-    offset of starting homonym group                    : binary_int
-    size of current homonym group                       : binary_int
-    ...
-    offset of starting homonym group                    : binary_int
-    size of current homonym group                       : binary_int
-
-    iper                                                : marshalled iper
-    ...
-    iper                                                : marshalled iper
-
-    \0
-
-
-  FIXME : It would be simpler to marshall lists of iper directly instead of having
-  to read an offset, a size and then the contents of each groups if it is compatible with later
-  developments.
+  TODO Rename homonyms to duplicates.
+  TODO Redo the documentation on the cache system for duplicates.
 *)
 let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
-  let homonym_table = Hashtbl.create (Gwdb.nb_of_persons base) in
-  Gwdb.load_persons_array base ;
-  Gwdb.load_strings_array base ;
-  Gwdb.Collection.iter begin fun p ->
-    (* FIXME: stop checking is_empty_name when possible *)
-    if not (Util.is_empty_name p) then
-      let k =
-        ( Name.lower @@ Ezgw.Person.surname base p
-        , Name.lower @@ Ezgw.Person.first_name base p )
-      in
-      match Hashtbl.find_opt homonym_table k with
-      | None -> Hashtbl.add homonym_table k [ p ]
-      | Some pers -> Hashtbl.replace homonym_table k (p :: pers)
-  end (Gwdb.persons base) ;
+  if not (is_cache_uptodate base (homonyms_main_file conf)) then
+    let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
+    Gwdb.Collection.iter begin fun p ->
+      (* FIXME: stop checking is_empty_name when possible *)
+      if not (Util.is_empty_name p) then
+        let k =
+          ( Name.lower @@ Ezgw.Person.surname base p
+          , Name.lower @@ Ezgw.Person.first_name base p )
+        in
+        match Hashtbl.find_opt ht k with
+        | None -> Hashtbl.add ht k [ p ]
+        | Some pers -> Hashtbl.replace ht k (p :: pers)
+    end (Gwdb.persons base) ;
+    let homonyms_ipers = Hashtbl.fold
+      (fun (_, _) persons l ->
+        if List.length persons < 2 then l
+        else (List.fold_left (fun l p -> (get_iper p) :: l) [] persons) :: l
+      ) ht []
+    in
+    let oc = open_out_bin (homonyms_main_file conf) in
+    Stdlib.output_value oc homonyms_ipers ;
+    close_out oc ;
+  let ic = open_in_bin (homonyms_main_file conf) in
+  let (homonyms_list:iper list list) = input_value ic in
+  close_in ic ;
+  let homonyms_list = List.fold_left (fun hlist entry ->
+    (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
+    ) [] homonyms_list
+  in
   let compare_names p1 p2 =
     match Utf8.compare
         (Util.name_key base @@ Ezgw.Person.surname base p1)
@@ -159,68 +163,56 @@ let build_cache_homonyms conf base =
     | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
     | x -> x
   in
-  Hashtbl.filter_map_inplace (fun (_, _) persons ->
-    if List.length persons < 2 then None else Some persons) homonym_table;
-
-  let filter_spouses ht = if Util.p_getenv conf.env "spouses" <> None then
-    Hashtbl.filter_map_inplace (fun (_, _) persons ->
-      let spouse_table = Hashtbl.create (List.length persons) in
-      List.iter (fun p ->
-        List.iter (fun spouse ->
-          (* FIXME: stop checking is_empty_name when possible *)
-          if not (Util.is_empty_name spouse) then
-            let k =
-              ( Name.lower @@ Ezgw.Person.surname base spouse
-              , Name.lower @@ Ezgw.Person.first_name base spouse )
-            in
-            match Hashtbl.find_opt spouse_table k with
-              None ->
-                Hashtbl.add spouse_table k [ p ]
-            | Some pers ->
-                Hashtbl.replace spouse_table k (p :: pers)
-        ) (get_person_spouses conf base p) ;
-      ) persons ;
-      (*
-        spouse_table links each spouse name of the current homonym group to a list of the persons
-        they are married to.
-      *)
-      let module PerSet =
-        Set.Make (struct
-          type t = person
-          let compare p1 p2 = match compare_names p1 p2 with
-            | 0 -> Ezgw.Person.occ p1 - Ezgw.Person.occ p2
-            | x -> x
-        end)
-      in
-      (*
-        A Set is used along with the list couple_list to ensure that there is no duplicates and
-        that the list is maintained in the order it was built in.
-      *)
-      let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
-        if (List.length persons) < 2 then (l, s)
-        else List.fold_left (fun (l, s) p ->
-          if Option.is_none (PerSet.find_opt p s) then
-            p :: l, PerSet.add p s
-          else
-            l, s
-        ) (l, s) persons
-      ) spouse_table ([], PerSet.empty)
-      in
-      if List.length couple_list < 2 then None
-      else Some couple_list
-    ) ht in
-
-  filter_spouses homonym_table;
-  let compare_homonyms h1 h2 = compare_names (List.hd h1) (List.hd h2) in
-  let homonyms = List.sort compare_homonyms
-    (Hashtbl.fold (fun _ sames all_homonyms ->
-      if List.length sames < 2 then all_homonyms
-      else sames :: all_homonyms
-    ) homonym_table [])
+  let filter_spouses hl = if Util.p_getenv conf.env "spouses" = None
+    then hl
+    else
+      List.filter_map (fun persons ->
+        let spouse_table = Hashtbl.create (List.length persons) in
+        List.iter (fun p ->
+          List.iter (fun spouse ->
+            (* FIXME: stop checking is_empty_name when possible *)
+            if not (Util.is_empty_name spouse) then
+              let k =
+                ( Name.lower @@ Ezgw.Person.surname base spouse
+                , Name.lower @@ Ezgw.Person.first_name base spouse )
+              in
+              match Hashtbl.find_opt spouse_table k with
+                None ->
+                  Hashtbl.add spouse_table k [ p ]
+              | Some pers ->
+                  Hashtbl.replace spouse_table k (p :: pers)
+          ) (get_person_spouses conf base p) ;
+        ) persons ;
+        let module PerSet =
+          Set.Make (struct
+            type t = person
+            let compare p1 p2 = match compare_names p1 p2 with
+              | 0 -> Ezgw.Person.occ p1 - Ezgw.Person.occ p2
+              | x -> x
+          end)
+        in
+        (*
+          A Set is used along with the list couple_list to ensure that there is no duplicates and
+          that the list is maintained in the order it was built in while staying fast.
+        *)
+        let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
+          if (List.length persons) < 2 then (l, s)
+          else List.fold_left (fun (l, s) p ->
+            if Option.is_none (PerSet.find_opt p s) then
+              p :: l, PerSet.add p s
+            else
+              l, s
+          ) (l, s) persons
+        ) spouse_table ([], PerSet.empty)
+        in
+        if List.length couple_list < 2 then None
+        else Some couple_list
+      ) hl
   in
-  Gwdb.clear_persons_array base ;
-  Gwdb.clear_strings_array base ;
-  let cache_filename = homonyms_file conf in
+
+  let homonyms_list = filter_spouses homonyms_list in
+  let homonyms = List.sort (fun h1 h2 -> compare_names (List.hd h1) (List.hd h2)) homonyms_list in
+  let cache_filename = homonyms_subfile conf in
   let oc = Secure.open_out_bin cache_filename in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
@@ -830,7 +822,7 @@ let handler =
         begin
           let page = (Opt.default 0 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 200 @@ Util.p_getint conf.env "sz" in
-          if not (is_cache_uptodate base (homonyms_file conf)
+          if not (is_cache_uptodate base (homonyms_subfile conf)
             && (check_homonyms_magic conf)) then build_cache_homonyms conf base;
           let homonyms, hidden_count, h_count, page_count, page = read_cache_homonyms conf base page size in
           let models = ("hidden_count", Tint hidden_count)
