@@ -25,13 +25,23 @@ let lower_fst =
     end ;
     Buffer.contents b
 
-let homonyms_file conf =
+let homonyms_main_file conf =
   Filename.concat (Util.base_path [] (conf.bname ^ ".gwb")) "cache_homonyms"
 
-let homonyms_magic = "GW_HOMONYMS_0016"
+let homonyms_subfile conf =
+  let filename = homonyms_main_file conf in
+  let filename = if Util.p_getenv conf.env "spouses" <> None
+    then String.concat "_" (filename :: ["spouses"])
+    else filename
+  in
+  if filename = homonyms_main_file conf
+    then String.concat "_" (filename :: ["default"])
+    else filename
+
+let homonyms_magic = "GW_HOMONYMS_0019"
 
 let check_homonyms_magic conf =
-  let ic = Secure.open_in_bin (homonyms_file conf) in
+  let ic = Secure.open_in_bin (homonyms_subfile conf) in
   let res = ((really_input_string ic (String.length homonyms_magic)) = homonyms_magic) in
   close_in ic;
   res
@@ -41,12 +51,12 @@ let is_cache_uptodate base cache_path =
     let cache_stat = Unix.stat (cache_path) in
     let cache_timeof_modif = cache_stat.Unix.st_mtime in
     let base_timeof_modif = Gwdb.date_of_last_change base in
-    (base_timeof_modif < cache_timeof_modif)
+    (base_timeof_modif < cache_timeof_modif) && false
   with
     Unix.Unix_error _ -> false
 
 let read_cache_homonyms conf base page_num size =
-  let cache_filename = homonyms_file conf in
+  let cache_filename = homonyms_subfile conf in
   let ic = Secure.open_in_bin cache_filename in
   seek_in ic (String.length homonyms_magic); (* ignoring magic number *)
   let h_count = input_binary_int ic in
@@ -130,27 +140,36 @@ let get_person_spouses conf base p =
 
     \0
 
-
-  FIXME : It would be simpler to marshall lists of iper directly instead of having
-  to read an offset, a size and then the contents of each groups if it is compatible with later
-  developments.
 *)
 let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
-  let homonym_table = Hashtbl.create (Gwdb.nb_of_persons base) in
-  Gwdb.load_persons_array base ;
-  Gwdb.load_strings_array base ;
-  Gwdb.Collection.iter begin fun p ->
-    (* FIXME: stop checking is_empty_name when possible *)
-    if not (Util.is_empty_name p) then
-      let k =
-        ( Name.lower @@ Ezgw.Person.surname base p
-        , Name.lower @@ Ezgw.Person.first_name base p )
-      in
-      match Hashtbl.find_opt homonym_table k with
-      | None -> Hashtbl.add homonym_table k [ p ]
-      | Some pers -> Hashtbl.replace homonym_table k (p :: pers)
-  end (Gwdb.persons base) ;
+  let homonym_table =
+    if not (is_cache_uptodate base (homonyms_main_file conf))
+    then
+      let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
+      Gwdb.Collection.iter begin fun p ->
+        (* FIXME: stop checking is_empty_name when possible *)
+        if not (Util.is_empty_name p) then
+          let k =
+            ( Name.lower @@ Ezgw.Person.surname base p
+            , Name.lower @@ Ezgw.Person.first_name base p )
+          in
+          match Hashtbl.find_opt ht k with
+          | None -> Hashtbl.add ht k [ p ]
+          | Some pers -> Hashtbl.replace ht k (p :: pers)
+      end (Gwdb.persons base) ;
+      Hashtbl.filter_map_inplace (fun (_, _) persons ->
+        if List.length persons < 2 then None else Some persons) ht;
+      let oc = open_out_bin (homonyms_main_file conf) in
+      Stdlib.output_value oc ht ; (* On verra plus tard avec Julien directement. *)
+      close_out oc ;
+      ht
+    else 
+      let ic = open_in_bin (homonyms_main_file conf) in
+      let ht = input_value ic in
+      close_in ic ;
+      ht
+  in
   let compare_names p1 p2 =
     match Utf8.compare
         (Util.name_key base @@ Ezgw.Person.surname base p1)
@@ -159,9 +178,6 @@ let build_cache_homonyms conf base =
     | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
     | x -> x
   in
-  Hashtbl.filter_map_inplace (fun (_, _) persons ->
-    if List.length persons < 2 then None else Some persons) homonym_table;
-
   let filter_spouses ht = if Util.p_getenv conf.env "spouses" <> None then
     Hashtbl.filter_map_inplace (fun (_, _) persons ->
       let spouse_table = Hashtbl.create (List.length persons) in
@@ -181,7 +197,7 @@ let build_cache_homonyms conf base =
         ) (get_person_spouses conf base p) ;
       ) persons ;
       (*
-        spouse_table links each spouse name of the current homonym group to a list of the persons
+        spouse_table links each spouse name of the current omonym group to a list of the persons
         they are married to.
       *)
       let module PerSet =
@@ -218,9 +234,7 @@ let build_cache_homonyms conf base =
       else sames :: all_homonyms
     ) homonym_table [])
   in
-  Gwdb.clear_persons_array base ;
-  Gwdb.clear_strings_array base ;
-  let cache_filename = homonyms_file conf in
+  let cache_filename = homonyms_subfile conf in
   let oc = Secure.open_out_bin cache_filename in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
   output_binary_int oc 0 ; (* empty space to write total_count later *)
@@ -830,7 +844,7 @@ let handler =
         begin
           let page = (Opt.default 0 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 200 @@ Util.p_getint conf.env "sz" in
-          if not (is_cache_uptodate base (homonyms_file conf)
+          if not (is_cache_uptodate base (homonyms_subfile conf)
             && (check_homonyms_magic conf)) then build_cache_homonyms conf base;
           let homonyms, hidden_count, h_count, page_count, page = read_cache_homonyms conf base page size in
           let models = ("hidden_count", Tint hidden_count)
