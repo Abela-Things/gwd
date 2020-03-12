@@ -126,34 +126,41 @@ let get_person_spouses conf base p =
 *)
 let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
-  if not (is_cache_uptodate base (homonyms_main_file conf)) then
-    let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
-    Gwdb.Collection.iter begin fun p ->
-      (* FIXME: stop checking is_empty_name when possible *)
-      if not (Util.is_empty_name p) then
-        let k =
-          ( Name.lower @@ Ezgw.Person.surname base p
-          , Name.lower @@ Ezgw.Person.first_name base p )
-        in
-        match Hashtbl.find_opt ht k with
-        | None -> Hashtbl.add ht k [ p ]
-        | Some pers -> Hashtbl.replace ht k (p :: pers)
-    end (Gwdb.persons base) ;
-    let homonyms_ipers = Hashtbl.fold
-      (fun (_, _) persons l ->
-        if List.length persons < 2 then l
-        else (List.fold_left (fun l p -> (get_iper p) :: l) [] persons) :: l
-      ) ht []
-    in
-    let oc = open_out_bin (homonyms_main_file conf) in
-    Stdlib.output_value oc homonyms_ipers ;
-    close_out oc ;
-  let ic = open_in_bin (homonyms_main_file conf) in
-  let (homonyms_list:iper list list) = input_value ic in
-  close_in ic ;
-  let homonyms_list = List.fold_left (fun hlist entry ->
-    (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
-    ) [] homonyms_list
+  let homonyms_list =
+    if not (is_cache_uptodate base (homonyms_main_file conf)) then begin
+      Gwdb.load_persons_array base ;
+      Gwdb.load_strings_array base ;
+      let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
+      Gwdb.Collection.iter begin fun p ->
+        (* FIXME: stop checking is_empty_name when possible *)
+        if not (Util.is_empty_name p) then
+          let k =
+            ( Name.lower @@ Ezgw.Person.surname base p
+            , Name.lower @@ Ezgw.Person.first_name base p )
+          in
+          match Hashtbl.find_opt ht k with
+          | None -> Hashtbl.add ht k [ p ]
+          | Some pers -> Hashtbl.replace ht k (p :: pers)
+      end (Gwdb.persons base) ;
+      Gwdb.clear_persons_array base ;
+      Gwdb.clear_strings_array base ;
+      let (homonyms_ipers, homonyms_persons) = Hashtbl.fold
+        (fun (_, _) persons (ip, hom) ->
+          if List.length persons < 2 then (ip, hom)
+          else (List.fold_left (fun l p -> (get_iper p) :: l) [] persons) :: ip, persons :: hom
+        ) ht ([],[])
+      in
+      let oc = open_out_bin (homonyms_main_file conf) in
+      Stdlib.output_value oc homonyms_ipers ;
+      close_out oc ;
+      homonyms_persons end
+    else begin
+      let ic = open_in_bin (homonyms_main_file conf) in
+      let (homonyms_ipers:iper list list) = input_value ic in
+      close_in ic ;
+      (List.fold_left (fun hlist entry ->
+        (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
+        ) [] homonyms_ipers) end
   in
   let compare_names p1 p2 =
     match Utf8.compare
@@ -210,8 +217,10 @@ let build_cache_homonyms conf base =
       ) hl
   in
 
+  Gwdb.load_strings_array base ;
   let homonyms_list = filter_spouses homonyms_list in
-  let homonyms = List.sort (fun h1 h2 -> compare_names (List.hd h1) (List.hd h2)) homonyms_list in
+  let homonyms = List.sort (fun h1 h2 -> compare_names (List.hd h1) (List.hd h2)) homonyms_list in (* takes a LOT of time !! *)
+  Gwdb.clear_strings_array base ;
   let cache_filename = homonyms_subfile conf in
   let oc = Secure.open_out_bin cache_filename in
   seek_out oc (String.length homonyms_magic) ; (* empty space to write magic number later *)
