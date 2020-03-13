@@ -102,20 +102,17 @@ let read_cache_homonyms conf base page_num size =
 (*
   Returns a person list consisting of every registered spouses for a given person.
 *)
-let get_person_spouses conf base p =
-  let rec loop i acc =
-    if i < Array.length (get_family p) then
-      let fam = foi base (get_family p).(i) in
+let get_person_spouses base p =
+  Array.fold_left (fun acc ifam ->
+      let fam = foi base ifam in
       let iconjoint = Gutil.spouse (get_iper p) fam in
-      let conjoint = Util.pget conf base iconjoint in
+      let conjoint = Gwdb.poi base iconjoint in
       (* FIXME: stop checking is_empty_name when possible *)
       if not (Util.is_empty_name conjoint) then
-        loop (i + 1) (conjoint :: acc)
+        conjoint :: acc
       else
-        loop (i + 1) acc
-    else
-      acc
-  in loop 0 []
+        acc
+    ) [] (get_family p)
 
 (*
   This function builds a cache file for storing homonyms that were found in a given tree.
@@ -126,10 +123,10 @@ let get_person_spouses conf base p =
 *)
 let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
+  Gwdb.load_persons_array base ;
+  Gwdb.load_strings_array base ;
   let homonyms_list =
     if not (is_cache_uptodate base (homonyms_main_file conf)) then begin
-      Gwdb.load_persons_array base ;
-      Gwdb.load_strings_array base ;
       let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
       Gwdb.Collection.iter begin fun p ->
         (* FIXME: stop checking is_empty_name when possible *)
@@ -142,8 +139,6 @@ let build_cache_homonyms conf base =
           | None -> Hashtbl.add ht k [ p ]
           | Some pers -> Hashtbl.replace ht k (p :: pers)
       end (Gwdb.persons base) ;
-      Gwdb.clear_persons_array base ;
-      Gwdb.clear_strings_array base ;
       let (homonyms_ipers, homonyms_persons) = Hashtbl.fold
         (fun (_, _) persons (ip, hom) ->
           if List.length persons < 2 then (ip, hom)
@@ -162,10 +157,12 @@ let build_cache_homonyms conf base =
         (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
         ) [] homonyms_ipers) end
   in
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
   let compare_names p1 p2 =
     match Utf8.compare
-        (Util.name_key base @@ Ezgw.Person.surname base p1)
-        (Util.name_key base @@ Ezgw.Person.surname base p2)
+        (Name.lower @@ Ezgw.Person.surname base p1)
+        (Name.lower @@ Ezgw.Person.surname base p2)
     with
     | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
     | x -> x
@@ -173,7 +170,8 @@ let build_cache_homonyms conf base =
   let filter_spouses hl = if Util.p_getenv conf.env "spouses" = None
     then hl
     else
-      List.filter_map (fun persons ->
+      let () = Gwdb.load_couples_array base in
+      let res = List.filter_map (fun persons ->
         let spouse_table = Hashtbl.create (List.length persons) in
         List.iter (fun p ->
           List.iter (fun spouse ->
@@ -188,7 +186,7 @@ let build_cache_homonyms conf base =
                   Hashtbl.add spouse_table k [ p ]
               | Some pers ->
                   Hashtbl.replace spouse_table k (p :: pers)
-          ) (get_person_spouses conf base p) ;
+          ) (get_person_spouses base p) ;
         ) persons ;
         let module PerSet =
           Set.Make (struct
@@ -205,16 +203,19 @@ let build_cache_homonyms conf base =
         let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
           if (List.length persons) < 2 then (l, s)
           else List.fold_left (fun (l, s) p ->
-            if Option.is_none (PerSet.find_opt p s) then
-              p :: l, PerSet.add p s
-            else
+            if PerSet.mem p s then
               l, s
+            else
+              (p :: l, PerSet.add p s)
           ) (l, s) persons
         ) spouse_table ([], PerSet.empty)
         in
         if List.length couple_list < 2 then None
         else Some couple_list
       ) hl
+      in
+      let () = Gwdb.clear_couples_array base in
+      res
   in
 
   Gwdb.load_strings_array base ;
@@ -828,7 +829,8 @@ let handler =
         end
 
       | "HOMONYMS" ->
-        begin
+        restricted_wizard
+        (fun _self conf base ->
           let page = (Opt.default 0 @@ Util.p_getint conf.env "pg") - 1 in
           let size = Opt.default 200 @@ Util.p_getint conf.env "sz" in
           if not (is_cache_uptodate base (homonyms_subfile conf)
@@ -843,7 +845,7 @@ let handler =
                     :: Data.default_env conf base
           in
           Interp.render ~conf ~file:"homonyms" ~models
-        end
+       ) self conf base
 
       | _ -> self.RequestHandler.incorrect_request self conf base
     end
