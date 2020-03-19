@@ -191,9 +191,7 @@ let build_cache_homonyms conf base =
         let module PerSet =
           Set.Make (struct
             type t = person
-            let compare p1 p2 = match compare_names p1 p2 with
-              | 0 -> Ezgw.Person.occ p1 - Ezgw.Person.occ p2
-              | x -> x
+            let compare p1 p2 = if p1 == p2 then 0 else 1
           end)
         in
         (*
