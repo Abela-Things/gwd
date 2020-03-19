@@ -99,6 +99,12 @@ let read_cache_homonyms conf base page_num size =
   close_in ic;
   cache_homonyms, hidden_start_count, h_count, page_count, page_num
 
+let is_empty_surname_or_last_name p =
+  Gwdb.is_empty_string (Gwdb.get_surname p)
+  || Gwdb.is_quest_string (Gwdb.get_surname p)
+  || Gwdb.is_empty_string (Gwdb.get_first_name p)
+  || Gwdb.is_quest_string (Gwdb.get_first_name p)
+
 (*
   Returns a person list consisting of every registered spouses for a given person.
 *)
@@ -108,7 +114,7 @@ let get_person_spouses base p =
       let iconjoint = Gutil.spouse (get_iper p) fam in
       let conjoint = Gwdb.poi base iconjoint in
       (* FIXME: stop checking is_empty_name when possible *)
-      if not (Util.is_empty_name conjoint) then
+      if not (is_empty_surname_or_last_name conjoint) then
         conjoint :: acc
       else
         acc
@@ -139,7 +145,7 @@ let build_cache_homonyms conf base =
       let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
       Gwdb.Collection.iter begin fun p ->
         (* FIXME: stop checking is_empty_name when possible *)
-        if not (Util.is_empty_name p) then
+        if not (is_empty_surname_or_last_name p) then
           let k =
               lower base (get_surname p)
             , lower base (get_first_name p)
@@ -168,6 +174,8 @@ let build_cache_homonyms conf base =
         (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
         ) [] homonyms_ipers), lower_ht end
   in
+  Gwdb.clear_persons_array base ;
+  Gwdb.clear_strings_array base ;
   let lower =
     fun base istr ->
     try Hashtbl.find lower_ht istr
@@ -176,8 +184,6 @@ let build_cache_homonyms conf base =
       Hashtbl.add lower_ht istr n ;
       n
   in
-  Gwdb.clear_persons_array base ;
-  Gwdb.clear_strings_array base ;
   let filter_spouses hl = if Util.p_getenv conf.env "spouses" = None
     then hl
     else
@@ -186,17 +192,15 @@ let build_cache_homonyms conf base =
         let spouse_table = Hashtbl.create (List.length persons) in
         List.iter (fun p ->
           List.iter (fun spouse ->
-            (* FIXME: stop checking is_empty_name when possible *)
-            if not (Util.is_empty_name spouse) then
-              let k =
-                  lower base (get_surname spouse)
-                , lower base (get_first_name spouse)
-              in
-              match Hashtbl.find_opt spouse_table k with
-                None ->
-                  Hashtbl.add spouse_table k [ p ]
-              | Some pers ->
-                  Hashtbl.replace spouse_table k (p :: pers)
+            let k =
+                lower base (get_surname spouse)
+              , lower base (get_first_name spouse)
+            in
+            match Hashtbl.find_opt spouse_table k with
+              None ->
+                Hashtbl.add spouse_table k [ p ]
+            | Some pers ->
+                Hashtbl.replace spouse_table k (p :: pers)
           ) (get_person_spouses base p) ;
         ) persons ;
         let module PerSet =
