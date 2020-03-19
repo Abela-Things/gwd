@@ -125,15 +125,24 @@ let build_cache_homonyms conf base =
   _bench __LOC__ @@ fun () ->
   Gwdb.load_persons_array base ;
   Gwdb.load_strings_array base ;
-  let homonyms_list =
+  let homonyms_list, lower_ht =
     if not (is_cache_uptodate base (homonyms_main_file conf)) then begin
+      let lower_ht = Hashtbl.create 1024 in
+      let lower =
+        fun base istr ->
+        try Hashtbl.find lower_ht istr
+        with Not_found ->
+          let n = Name.lower (Gwdb.sou base istr) in
+          Hashtbl.add lower_ht istr n ;
+          n
+      in
       let ht = Hashtbl.create (Gwdb.nb_of_persons base) in
       Gwdb.Collection.iter begin fun p ->
         (* FIXME: stop checking is_empty_name when possible *)
         if not (Util.is_empty_name p) then
           let k =
-            ( Name.lower @@ Ezgw.Person.surname base p
-            , Name.lower @@ Ezgw.Person.first_name base p )
+              lower base (get_surname p)
+            , lower base (get_first_name p)
           in
           match Hashtbl.find_opt ht k with
           | None -> Hashtbl.add ht k [ p ]
@@ -146,27 +155,29 @@ let build_cache_homonyms conf base =
         ) ht ([],[])
       in
       let oc = open_out_bin (homonyms_main_file conf) in
-      Stdlib.output_value oc homonyms_ipers ;
+      output_value oc homonyms_ipers ;
+      output_value oc lower_ht ;
       close_out oc ;
-      homonyms_persons end
+      homonyms_persons, lower_ht end
     else begin
       let ic = open_in_bin (homonyms_main_file conf) in
       let (homonyms_ipers:iper list list) = input_value ic in
+      let lower_ht = input_value ic in
       close_in ic ;
       (List.fold_left (fun hlist entry ->
         (List.fold_left (fun persons iper -> (Gwdb.poi base iper) :: persons) [] entry) :: hlist
-        ) [] homonyms_ipers) end
+        ) [] homonyms_ipers), lower_ht end
+  in
+  let lower =
+    fun base istr ->
+    try Hashtbl.find lower_ht istr
+    with Not_found ->
+      let n = Name.lower (Gwdb.sou base istr) in
+      Hashtbl.add lower_ht istr n ;
+      n
   in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
-  let compare_names p1 p2 =
-    match Utf8.compare
-        (Name.lower @@ Ezgw.Person.surname base p1)
-        (Name.lower @@ Ezgw.Person.surname base p2)
-    with
-    | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
-    | x -> x
-  in
   let filter_spouses hl = if Util.p_getenv conf.env "spouses" = None
     then hl
     else
@@ -178,8 +189,8 @@ let build_cache_homonyms conf base =
             (* FIXME: stop checking is_empty_name when possible *)
             if not (Util.is_empty_name spouse) then
               let k =
-                ( Name.lower @@ Ezgw.Person.surname base spouse
-                , Name.lower @@ Ezgw.Person.first_name base spouse )
+                  lower base (get_surname spouse)
+                , lower base (get_first_name spouse)
               in
               match Hashtbl.find_opt spouse_table k with
                 None ->
@@ -218,6 +229,14 @@ let build_cache_homonyms conf base =
 
   Gwdb.load_strings_array base ;
   let homonyms_list = filter_spouses homonyms_list in
+  let compare_names p1 p2 =
+    match Utf8.compare
+        (lower base (get_surname p1))
+        (lower base (get_surname p2))
+    with
+    | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
+    | x -> x
+  in
   let homonyms = List.sort (fun h1 h2 -> compare_names (List.hd h1) (List.hd h2)) homonyms_list in (* takes a LOT of time !! *)
   Gwdb.clear_strings_array base ;
   let cache_filename = homonyms_subfile conf in
