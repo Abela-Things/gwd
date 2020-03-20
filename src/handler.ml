@@ -176,14 +176,6 @@ let build_cache_homonyms conf base =
   in
   Gwdb.clear_persons_array base ;
   Gwdb.clear_strings_array base ;
-  let lower =
-    fun base istr ->
-    try Hashtbl.find lower_ht istr
-    with Not_found ->
-      let n = Name.lower (Gwdb.sou base istr) in
-      Hashtbl.add lower_ht istr n ;
-      n
-  in
   let filter_spouses hl = if Util.p_getenv conf.env "spouses" = None
     then hl
     else
@@ -193,8 +185,8 @@ let build_cache_homonyms conf base =
         List.iter (fun p ->
           List.iter (fun spouse ->
             let k =
-                lower base (get_surname spouse)
-              , lower base (get_first_name spouse)
+              Hashtbl.find lower_ht (get_surname spouse),
+              Hashtbl.find lower_ht (get_first_name spouse)
             in
             match Hashtbl.find_opt spouse_table k with
               None ->
@@ -225,8 +217,8 @@ let build_cache_homonyms conf base =
   let homonyms_list = filter_spouses homonyms_list in
   let compare_names p1 p2 =
     match Utf8.compare
-        (lower base (get_surname p1))
-        (lower base (get_surname p2))
+      (Hashtbl.find lower_ht (get_surname p1))
+      (Hashtbl.find lower_ht (get_surname p2))
     with
     | 0 -> Utf8.compare (Ezgw.Person.first_name base p1) (Ezgw.Person.first_name base p2)
     | x -> x
