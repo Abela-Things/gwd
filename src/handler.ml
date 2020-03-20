@@ -203,25 +203,15 @@ let build_cache_homonyms conf base =
                 Hashtbl.replace spouse_table k (p :: pers)
           ) (get_person_spouses base p) ;
         ) persons ;
-        let module PerSet =
-          Set.Make (struct
-            type t = person
-            let compare p1 p2 = if p1 == p2 then 0 else 1
-          end)
-        in
-        (*
-          A Set is used along with the list couple_list to ensure that there is no duplicates and
-          that the list is maintained in the order it was built in while staying fast.
-        *)
-        let couple_list, _ = Hashtbl.fold (fun _ persons (l, s) ->
-          if (List.length persons) < 2 then (l, s)
-          else List.fold_left (fun (l, s) p ->
-            if PerSet.mem p s then
-              l, s
+        let couple_list = Hashtbl.fold (fun _ persons l ->
+          if (List.length persons) < 2 then l
+          else List.fold_left (fun l p ->
+            if List.mem p l then
+              l
             else
-              (p :: l, PerSet.add p s)
-          ) (l, s) persons
-        ) spouse_table ([], PerSet.empty)
+              p :: l
+          ) l persons
+        ) spouse_table []
         in
         if List.length couple_list < 2 then None
         else Some couple_list
